@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Legend of the Verdant Realm — a 3D open-world adventure</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- No build tool: resolve bare module specifiers via an import map to a CDN -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD overlay -->
+  <div id="hud" class="hidden">
+    <div id="hearts" class="hud-row"></div>
+    <div id="wallet" class="hud-row">
+      <span class="rupee-icon"></span><span id="rupee-count">0</span>
+      <span class="key-icon"></span><span id="key-count">0</span>
+    </div>
+    <div id="prompt" class="hidden"></div>
+    <div id="toast"></div>
+  </div>
+
+  <!-- Inventory overlay -->
+  <div id="inventory" class="overlay hidden">
+    <h2>Inventory</h2>
+    <div id="inv-grid"></div>
+    <p class="hint">Press <kbd>I</kbd> or <kbd>Esc</kbd> to close</p>
+  </div>
+
+  <!-- Title / pause menu -->
+  <div id="menu" class="overlay">
+    <h1>Legend of the<br />Verdant Realm</h1>
+    <p class="subtitle">A 3D open-world adventure</p>
+    <div id="menu-buttons">
+      <button id="btn-continue" class="hidden">Continue</button>
+      <button id="btn-new">New Game</button>
+    </div>
+    <div id="controls-help">
+      <h3>Controls</h3>
+      <ul>
+        <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</li>
+        <li><kbd>Mouse</kbd> Look / orbit camera</li>
+        <li><kbd>Shift</kbd> Run &nbsp; <kbd>Space</kbd> Jump</li>
+        <li><kbd>Click</kbd> / <kbd>F</kbd> Swing sword</li>
+        <li><kbd>E</kbd> Interact (chests, doors)</li>
+        <li><kbd>I</kbd> Inventory &nbsp; <kbd>Esc</kbd> Pause</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="loading">Loading the realm…</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

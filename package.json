@@ -1,0 +1,12 @@
+{
+  "name": "verdant-realm",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A 3D open-world Zelda-like adventure built with Three.js, no build tool.",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "serve": "npx --yes serve -l 8000 .",
+    "check": "node --check js/main.js && node --check js/core/Game.js"
+  }
+}
