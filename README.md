@@ -64,6 +64,25 @@ declared in the import map in `index.html`.
   chests, and dungeon state) autosaves to `localStorage`. The title screen
   offers **Continue** whenever a save exists; **New Game** wipes it.
 
+## 🎨 Graphics & visual style
+
+A stylized, cel-shaded "Zelda" aesthetic rendered entirely with procedural
+geometry — no external textures or models:
+
+- **Cinematic pipeline** — ACES filmic tone mapping with a post-processing chain:
+  bloom (glowing sun, rupees, torches, portals, fireflies), SMAA anti-aliasing,
+  and tone-mapped sRGB output (`js/gfx/PostFX.js`).
+- **Atmospheric sky** — a custom gradient sky-dome shader with a soft glowing
+  sun, matched sun/sky lighting, and a baked environment map for reflections on
+  water, metal, and gems (`js/gfx/SkyEnv.js`).
+- **Cel-shaded characters** — toon gradient shading with crisp inverted-hull
+  silhouette outlines on the hero and enemies (`js/gfx/Materials.js`).
+- **Living world** — 16k wind-animated instanced grass blades, swaying tree
+  crowns, colourful flower clusters, rippling reflective water, drifting clouds,
+  and glowing fireflies (`js/gfx/Grass.js`, `js/gfx/Particles.js`).
+- **Soft shadows** and a smoothly-blended terrain palette (sand → meadow →
+  rock → snow).
+
 ## 🗂️ Project structure
 
 ```

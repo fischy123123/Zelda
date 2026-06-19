@@ -11,6 +11,7 @@ import { Pickup } from '../entities/Pickup.js';
 import { HUD } from '../ui/HUD.js';
 import { InventoryUI } from '../ui/InventoryUI.js';
 import { Menu } from '../ui/Menu.js';
+import { createComposer } from '../gfx/PostFX.js';
 
 const STATE = { TITLE: 'title', PLAYING: 'playing', PAUSED: 'paused', INVENTORY: 'inventory' };
 const PLAYER_RADIUS = 0.5;
@@ -29,10 +30,19 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Cinematic colour grading: filmic tone mapping in linear-sRGB.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 600);
+    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.clock = new THREE.Clock();
+
+    // Post-processing pipeline (bloom + anti-aliasing + tone-mapped output).
+    const fx = createComposer(this.renderer, this.scene, this.camera);
+    this.composer = fx.composer;
+    this.bloom = fx.bloom;
 
     // ---- Systems / UI ----
     this.input = new Input(canvas);
@@ -109,7 +119,7 @@ export class Game {
     for (const a of Object.values(this.areas)) {
       if (a.group.parent) this.scene.remove(a.group);
     }
-    this.areas = { overworld: new World(), dungeon: new Dungeon() };
+    this.areas = { overworld: new World(this.renderer), dungeon: new Dungeon(this.renderer) };
   }
 
   // Replace any existing hero (e.g. on restart) and add a fresh one to the scene.
@@ -157,6 +167,9 @@ export class Game {
     this.scene.add(area.group);
     this.scene.background = area.background;
     this.scene.fog = area.fog;
+    this.scene.environment = area.environment ?? null;
+    // Stronger bloom in the dark dungeon, gentler in daylight.
+    if (this.bloom) this.bloom.strength = area.name === 'dungeon' ? 0.95 : 0.6;
 
     // Point the persistent player + camera at this area's ground model.
     this.player.terrain = area.terrain;
@@ -246,7 +259,7 @@ export class Game {
     }
 
     this.input.endFrame();
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   _handleGlobalKeys() {
@@ -418,6 +431,7 @@ export class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
   }
 
   // ---------- collision ----------

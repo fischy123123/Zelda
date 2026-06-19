@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { stylizeCharacter } from '../gfx/Materials.js';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -79,6 +80,8 @@ export class Player {
 
     this.group.add(this.body, this.head, hat, this.legL, this.legR, this.armL, this.armR);
     this.group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    // Cel-shade the hero with a crisp silhouette outline.
+    stylizeCharacter(this.group, { thickness: 0.05 });
     this.walkPhase = 0;
   }
 

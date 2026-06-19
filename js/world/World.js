@@ -1,67 +1,94 @@
 import * as THREE from 'three';
 import { Terrain } from './Terrain.js';
-import { makeTree, makeRock, makeBush, makeRuin, makeDungeonEntrance } from './Props.js';
+import { makeTree, makeRock, makeBush, makeRuin, makeFlowers, makeDungeonEntrance } from './Props.js';
 import { Enemy } from '../entities/Enemy.js';
 import { Pickup } from '../entities/Pickup.js';
 import { Chest } from '../entities/Chest.js';
+import { SkyEnv } from '../gfx/SkyEnv.js';
+import { Grass } from '../gfx/Grass.js';
+import { Fireflies, Clouds } from '../gfx/Particles.js';
 
-// Builds and owns the open overworld: terrain, water, scattered props, enemies,
-// pickups, chests, and the dungeon entrance.
+// Builds and owns the open overworld: atmospheric sky, terrain, water, lush
+// grass, scattered props, enemies, pickups, chests, and the dungeon entrance.
 export class World {
-  constructor() {
+  constructor(renderer) {
     this.name = 'overworld';
-    this.terrain = new Terrain({ size: 400, segments: 200, maxHeight: 22, seed: 7 });
+    this.terrain = new Terrain({ size: 400, segments: 220, maxHeight: 22, seed: 7 });
     this.group = new THREE.Group();
     this.enemies = [];
     this.pickups = [];
     this.chests = [];
     this.colliders = [];          // overworld is open; props are non-blocking
     this.interactables = [];
+    this.swayables = [];          // tree crowns that bend in the wind
 
-    this.background = new THREE.Color(0x9bd3ff);
-    this.fog = new THREE.Fog(0x9bd3ff, 80, 320);
+    // ---- Sky, light, environment ----
+    this.sky = new SkyEnv(renderer, { elevationDeg: 28, azimuthDeg: 135 });
+    this.environment = this.sky.environment;
+    this.background = this.sky.fogColor.clone();
+    this.fog = new THREE.FogExp2(this.sky.fogColor.getHex(), 0.0026);
+    this.group.add(this.sky.mesh, this.sky.sun, this.sky.sun.target, this.sky.hemi, this.sky.fill);
+
     this.spawn = new THREE.Vector3(0, this.terrain.getHeightAt(0, 0), 0);
 
-    this._buildLighting();
     this.group.add(this.terrain.mesh);
     this._buildWater();
+    this._buildGrass();
     this._scatterProps();
+    this._buildClouds();
+    this._buildFireflies();
     this._buildDungeonEntrance();
     this._spawnEnemies();
     this._spawnLoot();
   }
 
-  _buildLighting() {
-    const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x4a6b3a, 0.9);
-    this.group.add(hemi);
-
-    const sun = new THREE.DirectionalLight(0xfff3d6, 1.5);
-    sun.position.set(60, 90, 30);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    const s = 90;
-    sun.shadow.camera.left = -s;
-    sun.shadow.camera.right = s;
-    sun.shadow.camera.top = s;
-    sun.shadow.camera.bottom = -s;
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 250;
-    sun.shadow.bias = -0.0004;
-    this.sun = sun;
-    this.group.add(sun);
-    this.group.add(sun.target);
-  }
-
   _buildWater() {
-    const geo = new THREE.PlaneGeometry(this.terrain.size, this.terrain.size, 1, 1);
+    // A rippling, reflective water plane. Waves are injected into the vertex
+    // shader; reflections come from the scene environment map.
+    const geo = new THREE.PlaneGeometry(this.terrain.size, this.terrain.size, 96, 96);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x2f7fd1, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.3,
+      color: 0x2b86c5,
+      transparent: true,
+      opacity: 0.82,
+      roughness: 0.12,
+      metalness: 0.0,
+      envMapIntensity: 1.2,
     });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = { value: 0 };
+      mat.userData.shader = shader;
+      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        /* glsl */`
+        #include <begin_vertex>
+        float w = sin(position.x * 0.25 + uTime * 1.3)
+                + sin(position.z * 0.32 + uTime * 1.7) * 0.7
+                + sin((position.x + position.z) * 0.15 + uTime) * 0.5;
+        transformed.y += w * 0.18;
+        `
+      );
+    };
     this.water = new THREE.Mesh(geo, mat);
     this.water.position.y = this.terrain.seaLevel;
     this.water.receiveShadow = true;
     this.group.add(this.water);
+  }
+
+  _buildGrass() {
+    this.grass = new Grass(this.terrain, { count: 16000, radius: 135 });
+    this.group.add(this.grass.mesh);
+  }
+
+  _buildClouds() {
+    this.clouds = new Clouds({ count: 16 });
+    this.group.add(this.clouds.group);
+  }
+
+  _buildFireflies() {
+    this.fireflies = new Fireflies({ count: 200, radius: 55 });
+    this.group.add(this.fireflies.points);
   }
 
   // Reject spots that are underwater or too close to the spawn meadow.
@@ -77,7 +104,7 @@ export class World {
   }
 
   _scatterProps() {
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 300; i++) {
       const spot = this._validSpot(12);
       if (!spot) continue;
       const h = this.terrain.getHeightAt(spot.x, spot.z);
@@ -86,10 +113,18 @@ export class World {
       else {
         const roll = Math.random();
         if (roll < 0.55) prop = makeTree(spot.x, spot.z, this.terrain);
-        else if (roll < 0.8) prop = makeRock(spot.x, spot.z, this.terrain);
+        else if (roll < 0.78) prop = makeRock(spot.x, spot.z, this.terrain);
         else prop = makeBush(spot.x, spot.z, this.terrain);
       }
+      if (prop.userData.sway) this.swayables.push(prop.userData.sway);
       this.group.add(prop);
+    }
+    // Colourful flower clusters in the meadow.
+    for (let i = 0; i < 60; i++) {
+      const spot = this._validSpot(8, 120);
+      if (spot && this.terrain.getHeightAt(spot.x, spot.z) < this.terrain.maxHeight * 0.45) {
+        this.group.add(makeFlowers(spot.x, spot.z, this.terrain));
+      }
     }
     // A few ruin landmarks.
     for (let i = 0; i < 5; i++) {
@@ -101,7 +136,6 @@ export class World {
   _buildDungeonEntrance() {
     // Place the entrance at a fixed, reachable spot on dry land.
     let x = 48, z = -34;
-    // Nudge to dry land if needed.
     if (this.terrain.isUnderwater(x, z)) { x = 30; z = 30; }
     this.entrancePos = new THREE.Vector3(x, this.terrain.getHeightAt(x, z), z);
     this.entrance = makeDungeonEntrance(x, z, this.terrain);
@@ -127,7 +161,6 @@ export class World {
   }
 
   _spawnLoot() {
-    // Scattered rupees.
     for (let i = 0; i < 16; i++) {
       const spot = this._validSpot(14, 170);
       if (!spot) continue;
@@ -140,7 +173,6 @@ export class World {
       this.group.add(p.mesh);
     }
 
-    // Overworld chests: a shield, a bow, and a bomb bag.
     const chestDefs = [
       { dx: -24, dz: 18, reward: { itemId: 'shield', count: 1 } },
       { dx: 20, dz: 40, reward: { itemId: 'bow', count: 1 } },
@@ -162,20 +194,32 @@ export class World {
   }
 
   update(dt, elapsed) {
-    // Animate the portal shimmer and water.
+    const focus = this._followTarget;
+
+    // Portal shimmer.
     if (this.entrance?.userData.portal) {
       const p = this.entrance.userData.portal;
       p.material.opacity = 0.4 + Math.sin(elapsed * 3) * 0.18;
       p.rotation.z += dt * 0.5;
     }
-    if (this.water) {
-      this.water.position.y = this.terrain.seaLevel + Math.sin(elapsed * 0.8) * 0.08;
+
+    // Animated water + grass + clouds + fireflies.
+    if (this.water?.material.userData.shader) {
+      this.water.material.userData.shader.uniforms.uTime.value = elapsed;
     }
-    // Keep the sun shadow frustum centered on the action.
-    if (this.sun && this._followTarget) {
-      this.sun.position.set(this._followTarget.x + 60, 90, this._followTarget.z + 30);
-      this.sun.target.position.copy(this._followTarget);
+    this.grass?.update(elapsed);
+    this.clouds?.update(dt);
+    this.fireflies?.update(elapsed, focus);
+
+    // Wind sway on tree crowns.
+    for (const s of this.swayables) {
+      s.crown.rotation.x = Math.sin(elapsed * 1.2 + s.phase) * s.amp;
+      s.crown.rotation.z = Math.cos(elapsed * 0.9 + s.phase) * s.amp;
     }
+
+    // Keep the sky dome and sun shadow frustum centered on the viewer.
+    if (focus) this.sky.follow(focus);
+
     for (const c of this.chests) c.update(dt);
   }
 

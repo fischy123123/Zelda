@@ -5,30 +5,67 @@ import * as THREE from 'three';
 
 export function makeTree(x, z, terrain) {
   const g = new THREE.Group();
-  const trunkH = 2.4 + Math.random() * 1.6;
+  const trunkH = 2.6 + Math.random() * 1.8;
 
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.22, 0.32, trunkH, 6),
-    new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 })
+    new THREE.CylinderGeometry(0.2, 0.36, trunkH, 7),
+    new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1, flatShading: true })
   );
   trunk.position.y = trunkH / 2;
   trunk.castShadow = true;
   g.add(trunk);
 
-  const foliageColor = new THREE.Color().setHSL(0.32, 0.55, 0.32 + Math.random() * 0.1);
-  for (let i = 0; i < 3; i++) {
-    const r = 1.6 - i * 0.4;
-    const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(r, 1.6, 7),
-      new THREE.MeshStandardMaterial({ color: foliageColor, roughness: 0.9, flatShading: true })
+  // A rounded, stylized canopy made of clustered low-poly spheres. The canopy
+  // sits in its own pivot group so the whole crown can sway in the wind.
+  const crown = new THREE.Group();
+  crown.position.y = trunkH;
+  const hue = 0.27 + Math.random() * 0.07;
+  const baseLight = 0.3 + Math.random() * 0.08;
+  const blobs = 4 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < blobs; i++) {
+    const r = 1.0 + Math.random() * 0.7;
+    const col = new THREE.Color().setHSL(hue, 0.5, baseLight + Math.random() * 0.1);
+    const blob = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(r, 1),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true })
     );
-    cone.position.y = trunkH + i * 0.9;
-    cone.castShadow = true;
-    g.add(cone);
+    const a = (i / blobs) * Math.PI * 2;
+    blob.position.set(Math.cos(a) * 0.7, 0.4 + Math.random() * 0.8, Math.sin(a) * 0.7);
+    blob.castShadow = true;
+    crown.add(blob);
   }
+  g.add(crown);
 
   g.position.set(x, terrain.getHeightAt(x, z), z);
   g.rotation.y = Math.random() * Math.PI * 2;
+
+  // Tag for wind animation in World.update.
+  g.userData.sway = { crown, phase: Math.random() * Math.PI * 2, amp: 0.04 + Math.random() * 0.03 };
+  return g;
+}
+
+// A small cluster of bright flowers for colour accents in the meadow.
+export function makeFlowers(x, z, terrain) {
+  const g = new THREE.Group();
+  const palette = [0xff5d8f, 0xffd23f, 0xffffff, 0x8a6cff, 0xff8a3d];
+  const n = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.4, 4),
+      new THREE.MeshStandardMaterial({ color: 0x3f7e3a })
+    );
+    const color = palette[(Math.random() * palette.length) | 0];
+    const head = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.12, 0),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.25, flatShading: true })
+    );
+    head.position.y = 0.25;
+    const f = new THREE.Group();
+    f.add(stem, head);
+    f.position.set((Math.random() - 0.5) * 0.8, 0.2, (Math.random() - 0.5) * 0.8);
+    g.add(f);
+  }
+  g.position.set(x, terrain.getHeightAt(x, z), z);
   return g;
 }
 

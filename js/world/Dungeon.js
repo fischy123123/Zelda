@@ -15,7 +15,7 @@ const FLAT = {
 // Builds the dungeon interior: two rooms split by a locked gate, torches,
 // guards, and a reward chest in the treasure room.
 export class Dungeon {
-  constructor() {
+  constructor(_renderer) {
     this.name = 'dungeon';
     this.terrain = FLAT;
     this.group = new THREE.Group();
@@ -26,9 +26,10 @@ export class Dungeon {
     this.interactables = [];
     this.unlocked = false;
     this.cleared = false;
+    this.environment = null; // dark interior — lit only by torches
 
-    this.background = new THREE.Color(0x0a0c12);
-    this.fog = new THREE.Fog(0x0a0c12, 10, 60);
+    this.background = new THREE.Color(0x05070b);
+    this.fog = new THREE.FogExp2(0x05070b, 0.05);
     this.spawn = new THREE.Vector3(0, 0, -16);
 
     this._buildShell();
@@ -119,9 +120,10 @@ export class Dungeon {
       );
       post.position.set(x, 1.0, z);
       const flame = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xffb347 })
+        new THREE.SphereGeometry(0.22, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffd27a })
       );
+      flame.scale.y = 1.4;
       flame.position.set(x, 1.7, z);
       const light = new THREE.PointLight(0xffa54f, 6, 14, 1.6);
       light.position.set(x, 1.9, z);

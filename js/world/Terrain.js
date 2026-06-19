@@ -71,11 +71,32 @@ export class Terrain {
   }
 
   _colorForHeight(h) {
+    // Smoothly blend between palette stops for soft, natural transitions
+    // instead of hard banding.
+    const sand = new THREE.Color(0xe4d7a4);
+    const grass = new THREE.Color(0x5aa84a);
+    const grassDark = new THREE.Color(0x3f7e3a);
+    const rock = new THREE.Color(0x77756a);
+    const snow = new THREE.Color(0xeef4f7);
+
+    const max = this.maxHeight;
     const c = new THREE.Color();
-    if (h < this.seaLevel + 0.4) c.setHex(0xccc18a);        // sand near water
-    else if (h < this.maxHeight * 0.45) c.setHex(0x4f9d4a);  // grass
-    else if (h < this.maxHeight * 0.72) c.setHex(0x6b6f59);  // rocky slope
-    else c.setHex(0xe9eef2);                                  // snowy peak
+    if (h < this.seaLevel + 1.2) {
+      const t = THREE.MathUtils.smoothstep(h, this.seaLevel - 0.5, this.seaLevel + 1.2);
+      c.copy(sand).lerp(grass, t);
+    } else if (h < max * 0.4) {
+      const t = THREE.MathUtils.smoothstep(h, this.seaLevel + 1.2, max * 0.4);
+      c.copy(grass).lerp(grassDark, t * 0.6);
+    } else if (h < max * 0.68) {
+      const t = THREE.MathUtils.smoothstep(h, max * 0.4, max * 0.68);
+      c.copy(grassDark).lerp(rock, t);
+    } else {
+      const t = THREE.MathUtils.smoothstep(h, max * 0.68, max * 0.92);
+      c.copy(rock).lerp(snow, t);
+    }
+    // Tiny per-vertex tint variation breaks up flat patches.
+    const j = (Math.random() - 0.5) * 0.05;
+    c.offsetHSL(0, 0, j);
     return c;
   }
 

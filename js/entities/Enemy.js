@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { stylizeCharacter } from '../gfx/Materials.js';
 
 // Simple enemy with patrol + chase AI. Two flavors:
 //   'chu'    — a bouncy slime (weak)
@@ -58,6 +59,8 @@ export class Enemy {
       g.add(body, e1, e2);
     }
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    // Cel-shade with an outline; keep the slime translucent so it still reads as jelly.
+    stylizeCharacter(g, { thickness: kind === 'chu' ? 0.04 : 0.06 });
     return g;
   }
 
