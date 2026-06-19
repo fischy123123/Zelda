@@ -1,31 +1,43 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// Builds the post-processing pipeline: scene render -> bloom -> anti-alias ->
-// tone-mapped sRGB output. Bloom makes emissive surfaces (rupees, torches, the
-// sun, portals, fireflies) glow for a polished, cinematic look.
+// Builds the post-processing pipeline:
+//   scene render (MSAA) -> ambient occlusion -> bloom -> SMAA -> tone-mapped sRGB
+// MSAA + SMAA give crisp edges; GTAO grounds objects with soft contact shadows;
+// bloom makes emissive surfaces glow. Everything runs in an HDR (half-float)
+// buffer so highlights bloom smoothly.
 export function createComposer(renderer, scene, camera) {
   const size = renderer.getSize(new THREE.Vector2());
   const pr = renderer.getPixelRatio();
 
-  // HDR float target so bright highlights bloom smoothly.
+  // Hardware multi-sampled, HDR render target → crisp geometry edges.
   const target = new THREE.WebGLRenderTarget(size.x * pr, size.y * pr, {
     type: THREE.HalfFloatType,
-    samples: 0,
+    samples: 4,
   });
   const composer = new EffectComposer(renderer, target);
-
   composer.addPass(new RenderPass(scene, camera));
+
+  // Ground-contact ambient occlusion for depth and polish (best-effort).
+  let gtao = null;
+  try {
+    gtao = new GTAOPass(scene, camera, size.x, size.y);
+    gtao.output = GTAOPass.OUTPUT.Default;
+    composer.addPass(gtao);
+  } catch (e) {
+    console.warn('[PostFX] ambient occlusion unavailable, skipping:', e);
+  }
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(size.x, size.y),
-    0.65, // strength
-    0.55, // radius
-    0.82  // threshold — only bright/emissive pixels glow
+    0.55, // strength
+    0.5,  // radius
+    0.85  // threshold
   );
   composer.addPass(bloom);
 
@@ -34,5 +46,5 @@ export function createComposer(renderer, scene, camera) {
 
   composer.addPass(new OutputPass());
 
-  return { composer, bloom, smaa };
+  return { composer, bloom, gtao, smaa };
 }

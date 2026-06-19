@@ -259,7 +259,19 @@ export class Game {
     }
 
     this.input.endFrame();
-    this.composer.render();
+    // Render through the post pipeline; if any effect fails at runtime, fall
+    // back to a plain render so the game never black-screens.
+    if (this.composerBroken) {
+      this.renderer.render(this.scene, this.camera);
+    } else {
+      try {
+        this.composer.render();
+      } catch (e) {
+        console.error('[Game] post-processing failed, falling back to direct render:', e);
+        this.composerBroken = true;
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
   }
 
   _handleGlobalKeys() {

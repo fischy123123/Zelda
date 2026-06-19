@@ -74,13 +74,15 @@ export class SkyEnv {
     this.sun = new THREE.DirectionalLight(0xfff1d4, 2.4);
     this.sun.position.copy(this.sunDir).multiplyScalar(120);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
-    const s = 90;
+    // High-res shadow map with a tight frustum (it follows the player) for
+    // crisp, well-defined shadows.
+    this.sun.shadow.mapSize.set(4096, 4096);
+    const s = 70;
     const cam = this.sun.shadow.camera;
     cam.left = -s; cam.right = s; cam.top = s; cam.bottom = -s;
     cam.near = 1; cam.far = 320;
-    this.sun.shadow.bias = -0.0004;
-    this.sun.shadow.normalBias = 0.04;
+    this.sun.shadow.bias = -0.00018;
+    this.sun.shadow.normalBias = 0.025;
 
     this.hemi = new THREE.HemisphereLight(horizonColor, groundColor, 0.65);
     this.fill = new THREE.DirectionalLight(0xbfd4ff, 0.35); // cool sky fill

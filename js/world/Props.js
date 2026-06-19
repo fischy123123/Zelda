@@ -26,8 +26,8 @@ export function makeTree(x, z, terrain) {
     const r = 1.0 + Math.random() * 0.7;
     const col = new THREE.Color().setHSL(hue, 0.5, baseLight + Math.random() * 0.1);
     const blob = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(r, 1),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true })
+      new THREE.IcosahedronGeometry(r, 2),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.8, flatShading: false })
     );
     const a = (i / blobs) * Math.PI * 2;
     blob.position.set(Math.cos(a) * 0.7, 0.4 + Math.random() * 0.8, Math.sin(a) * 0.7);
@@ -84,9 +84,9 @@ export function makeRock(x, z, terrain) {
 
 export function makeBush(x, z, terrain) {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x3f8a3a, roughness: 0.95, flatShading: true });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x3f8a3a, roughness: 0.9, flatShading: false });
   for (let i = 0; i < 3; i++) {
-    const blob = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5 + Math.random() * 0.3, 0), mat);
+    const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + Math.random() * 0.3, 2), mat);
     blob.position.set((Math.random() - 0.5) * 0.8, 0.4, (Math.random() - 0.5) * 0.8);
     blob.castShadow = true;
     g.add(blob);

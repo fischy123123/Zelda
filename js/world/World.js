@@ -13,7 +13,7 @@ import { Fireflies, Clouds } from '../gfx/Particles.js';
 export class World {
   constructor(renderer) {
     this.name = 'overworld';
-    this.terrain = new Terrain({ size: 400, segments: 220, maxHeight: 22, seed: 7 });
+    this.terrain = new Terrain({ size: 400, segments: 320, maxHeight: 22, seed: 7 });
     this.group = new THREE.Group();
     this.enemies = [];
     this.pickups = [];

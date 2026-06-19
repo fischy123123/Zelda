@@ -119,9 +119,10 @@ export class Terrain {
 
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.95,
+      roughness: 0.92,
       metalness: 0.0,
-      flatShading: true,
+      flatShading: false, // smooth, rolling hills rather than blocky facets
+      envMapIntensity: 0.35,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
