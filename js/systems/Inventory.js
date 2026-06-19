@@ -1,4 +1,4 @@
-import { getItem } from '../data/items.js?v=7';
+import { getItem } from '../data/items.js?v=8';
 
 // Tracks owned items, rupees, keys, and the currently equipped gear.
 export class Inventory {

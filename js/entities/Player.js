@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=7';
-import { CharacterModel } from './CharacterModel.js?v=7';
+import { stylizeCharacter } from '../gfx/Materials.js?v=8';
+import { CharacterModel } from './CharacterModel.js?v=8';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -126,12 +126,12 @@ export class Player {
     this.head.add(face, hairBack, nose);
 
     // ---------- Cap (long pointed hat) ----------
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.55, 16), mat(C.tunic));
-    cap.position.set(0, 0.3, -0.03);
+    const hatCone = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.55, 16), mat(C.tunic));
+    hatCone.position.set(0, 0.3, -0.03);
     const brim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 8, 16), mat(C.tunicDk));
     brim.position.set(0, 0.08, 0);
     brim.rotation.x = Math.PI / 2;
-    this.head.add(cap, brim);
+    this.head.add(hatCone, brim);
     // Floppy tail draping down the back, made of tapering segments.
     this.capTail = [];
     let prev = new THREE.Group();
