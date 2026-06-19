@@ -42,6 +42,7 @@ export class SkyEnv {
     horizonColor = 0xcfe8ff,
     groundColor = 0x9fb88a,
     sunColor = 0xfff3d0,
+    shadowMapSize = 4096,
   } = {}) {
     this.sunDir = new THREE.Vector3().setFromSphericalCoords(
       1,
@@ -76,7 +77,7 @@ export class SkyEnv {
     this.sun.castShadow = true;
     // High-res shadow map with a tight frustum (it follows the player) for
     // crisp, well-defined shadows.
-    this.sun.shadow.mapSize.set(4096, 4096);
+    this.sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
     const s = 70;
     const cam = this.sun.shadow.camera;
     cam.left = -s; cam.right = s; cam.top = s; cam.bottom = -s;

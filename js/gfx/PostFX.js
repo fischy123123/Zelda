@@ -11,26 +11,30 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // MSAA + SMAA give crisp edges; GTAO grounds objects with soft contact shadows;
 // bloom makes emissive surfaces glow. Everything runs in an HDR (half-float)
 // buffer so highlights bloom smoothly.
-export function createComposer(renderer, scene, camera) {
+export function createComposer(renderer, scene, camera, quality = {}) {
+  const { samples = 4, ao = true } = quality;
   const size = renderer.getSize(new THREE.Vector2());
   const pr = renderer.getPixelRatio();
 
   // Hardware multi-sampled, HDR render target → crisp geometry edges.
   const target = new THREE.WebGLRenderTarget(size.x * pr, size.y * pr, {
     type: THREE.HalfFloatType,
-    samples: 4,
+    samples,
   });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
 
-  // Ground-contact ambient occlusion for depth and polish (best-effort).
+  // Ground-contact ambient occlusion for depth and polish (best-effort, and
+  // skipped on low-power devices).
   let gtao = null;
-  try {
-    gtao = new GTAOPass(scene, camera, size.x, size.y);
-    gtao.output = GTAOPass.OUTPUT.Default;
-    composer.addPass(gtao);
-  } catch (e) {
-    console.warn('[PostFX] ambient occlusion unavailable, skipping:', e);
+  if (ao) {
+    try {
+      gtao = new GTAOPass(scene, camera, size.x, size.y);
+      gtao.output = GTAOPass.OUTPUT.Default;
+      composer.addPass(gtao);
+    } catch (e) {
+      console.warn('[PostFX] ambient occlusion unavailable, skipping:', e);
+    }
   }
 
   const bloom = new UnrealBloomPass(

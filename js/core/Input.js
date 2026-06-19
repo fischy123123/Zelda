@@ -7,6 +7,11 @@ export class Input {
     this.mouse = { dx: 0, dy: 0, down: false, clicked: false };
     this.pointerLocked = false;
 
+    // Touch / virtual-gamepad state (driven by TouchControls on phones/tablets).
+    this.isTouch = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)
+      || (navigator.maxTouchPoints || 0) > 0;
+    this.touchMove = { x: 0, y: 0 };  // analog joystick: +x right, +y forward
+
     window.addEventListener('keydown', (e) => {
       const code = e.code;
       if (!this.keys.has(code)) this.pressed.add(code);
@@ -31,9 +36,10 @@ export class Input {
       }
     });
 
-    // Pointer lock gives us a free-look camera while playing.
+    // Pointer lock gives us a free-look camera while playing (desktop only;
+    // touch devices use the on-screen look pad instead).
     canvas.addEventListener('click', () => {
-      if (!this.pointerLocked) canvas.requestPointerLock();
+      if (!this.isTouch && !this.pointerLocked) canvas.requestPointerLock();
     });
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = document.pointerLockElement === canvas;
@@ -44,6 +50,12 @@ export class Input {
 
   // True only on the first frame the key was pressed this update.
   wasPressed(code) { return this.pressed.has(code); }
+
+  // Inject an edge-triggered "press" from an on-screen button.
+  triggerPress(code) { this.pressed.add(code); }
+
+  // Feed look movement from the touch look-pad (bypasses pointer lock).
+  addLook(dx, dy) { this.mouse.dx += dx; this.mouse.dy += dy; }
 
   consumeClick() {
     const c = this.mouse.clicked;

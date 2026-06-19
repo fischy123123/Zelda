@@ -11,6 +11,7 @@ import { Pickup } from '../entities/Pickup.js';
 import { HUD } from '../ui/HUD.js';
 import { InventoryUI } from '../ui/InventoryUI.js';
 import { Menu } from '../ui/Menu.js';
+import { TouchControls } from '../ui/TouchControls.js';
 import { createComposer } from '../gfx/PostFX.js';
 
 const STATE = { TITLE: 'title', PLAYING: 'playing', PAUSED: 'paused', INVENTORY: 'inventory' };
@@ -24,10 +25,18 @@ export class Game {
     this.autosaveTimer = 0;
     this.openedChestIds = new Set();
 
+    // ---- Device / quality detection ----
+    const coarse = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)
+      || (navigator.maxTouchPoints || 0) > 0;
+    this.isMobile = coarse && Math.min(window.innerWidth, window.innerHeight) < 1100;
+    this.quality = this.isMobile
+      ? { pixelRatio: 1.5, samples: 0, ao: false, grass: 5000, shadowMap: 1024, propScale: 0.55, fireflies: 90 }
+      : { pixelRatio: 2, samples: 4, ao: true, grass: 16000, shadowMap: 4096, propScale: 1, fireflies: 200 };
+
     // ---- Renderer / scene / camera ----
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.pixelRatio));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Cinematic colour grading: filmic tone mapping in linear-sRGB.
@@ -40,7 +49,7 @@ export class Game {
     this.clock = new THREE.Clock();
 
     // Post-processing pipeline (bloom + anti-aliasing + tone-mapped output).
-    const fx = createComposer(this.renderer, this.scene, this.camera);
+    const fx = createComposer(this.renderer, this.scene, this.camera, this.quality);
     this.composer = fx.composer;
     this.bloom = fx.bloom;
 
@@ -53,6 +62,8 @@ export class Game {
       onNewGame: () => this.newGame(),
       onContinue: () => this.onContinue(),
     });
+    // On-screen controls for touch devices.
+    this.touch = this.input.isTouch ? new TouchControls(this.input) : null;
 
     this.activeArea = null;
     this.areas = {};
@@ -119,7 +130,7 @@ export class Game {
     for (const a of Object.values(this.areas)) {
       if (a.group.parent) this.scene.remove(a.group);
     }
-    this.areas = { overworld: new World(this.renderer), dungeon: new Dungeon(this.renderer) };
+    this.areas = { overworld: new World(this.renderer, this.quality), dungeon: new Dungeon(this.renderer) };
   }
 
   // Replace any existing hero (e.g. on restart) and add a fresh one to the scene.
@@ -146,6 +157,7 @@ export class Game {
     this.menu.hide();
     this.inventoryUI.close();
     this.hud.show();
+    this.touch?.show();
     document.getElementById('loading').classList.add('hidden');
   }
 

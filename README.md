@@ -41,6 +41,19 @@ declared in the import map in `index.html`.
 | Inventory         | `I`                           |
 | Pause             | `Esc`                         |
 
+## 📱 Playing on a phone
+
+The game is fully touch-enabled and works in a mobile browser — just open the
+GitHub Pages link on your phone:
+
+- **Left thumb** — analog stick to move (push further = run faster)
+- **Right side** — drag anywhere to look / orbit the camera
+- **⚔ button** — swing the Master Sword &nbsp; **↥** — jump &nbsp; **E** — interact
+- **»** — hold to run &nbsp; **🎒** — inventory &nbsp; **Ⅱ** — pause
+- Graphics quality scales down automatically on mobile for a smooth frame rate.
+
+Tip: add the page to your home screen for a full-screen, app-like experience.
+
 ## ✨ Features
 
 - **Open world** — procedurally generated rolling terrain with grass, sand,

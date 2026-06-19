@@ -11,8 +11,11 @@ import { Fireflies, Clouds } from '../gfx/Particles.js';
 // Builds and owns the open overworld: atmospheric sky, terrain, water, lush
 // grass, scattered props, enemies, pickups, chests, and the dungeon entrance.
 export class World {
-  constructor(renderer) {
+  constructor(renderer, quality = {}) {
     this.name = 'overworld';
+    this.quality = {
+      grass: 16000, shadowMap: 4096, propScale: 1, fireflies: 200, ...quality,
+    };
     this.terrain = new Terrain({ size: 400, segments: 320, maxHeight: 22, seed: 7 });
     this.group = new THREE.Group();
     this.enemies = [];
@@ -23,7 +26,7 @@ export class World {
     this.swayables = [];          // tree crowns that bend in the wind
 
     // ---- Sky, light, environment ----
-    this.sky = new SkyEnv(renderer, { elevationDeg: 28, azimuthDeg: 135 });
+    this.sky = new SkyEnv(renderer, { elevationDeg: 28, azimuthDeg: 135, shadowMapSize: this.quality.shadowMap });
     this.environment = this.sky.environment;
     this.background = this.sky.fogColor.clone();
     this.fog = new THREE.FogExp2(this.sky.fogColor.getHex(), 0.0026);
@@ -77,7 +80,7 @@ export class World {
   }
 
   _buildGrass() {
-    this.grass = new Grass(this.terrain, { count: 16000, radius: 135 });
+    this.grass = new Grass(this.terrain, { count: this.quality.grass, radius: 135 });
     this.group.add(this.grass.mesh);
   }
 
@@ -87,7 +90,7 @@ export class World {
   }
 
   _buildFireflies() {
-    this.fireflies = new Fireflies({ count: 200, radius: 55 });
+    this.fireflies = new Fireflies({ count: this.quality.fireflies, radius: 55 });
     this.group.add(this.fireflies.points);
   }
 
@@ -104,7 +107,8 @@ export class World {
   }
 
   _scatterProps() {
-    for (let i = 0; i < 300; i++) {
+    const propCount = Math.round(300 * this.quality.propScale);
+    for (let i = 0; i < propCount; i++) {
       const spot = this._validSpot(12);
       if (!spot) continue;
       const h = this.terrain.getHeightAt(spot.x, spot.z);

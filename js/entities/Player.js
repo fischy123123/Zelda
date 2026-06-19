@@ -302,13 +302,22 @@ export class Player {
     if (input.isDown('KeyD') || input.isDown('ArrowRight')) move.add(right);
     if (input.isDown('KeyA') || input.isDown('ArrowLeft')) move.sub(right);
 
+    // Touch joystick (analog): magnitude scales speed for a natural feel.
+    const tm = input.touchMove;
+    if (tm && (tm.x !== 0 || tm.y !== 0)) {
+      move.addScaledVector(forward, tm.y);
+      move.addScaledVector(right, tm.x);
+    }
+
     const running = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
-    const speed = running ? RUN_SPEED : WALK_SPEED;
+    const maxSpeed = running ? RUN_SPEED : WALK_SPEED;
     const pos = this.group.position;
 
     let moving = false;
-    if (move.lengthSq() > 0) {
+    const mag = Math.min(1, move.length());
+    if (mag > 0.05) {
       move.normalize();
+      const speed = maxSpeed * mag;
       pos.x += move.x * speed * dt;
       pos.z += move.z * speed * dt;
       this.facing = Math.atan2(move.x, move.z);
