@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=12';
-import { CharacterModel } from './CharacterModel.js?v=12';
-import { HeroModel } from './HeroModel.js?v=12';
-import { AnimatedHero } from './AnimatedHero.js?v=12';
+import { stylizeCharacter } from '../gfx/Materials.js?v=13';
+import { CharacterModel } from './CharacterModel.js?v=13';
+import { HeroModel } from './HeroModel.js?v=13';
+import { AnimatedHero } from './AnimatedHero.js?v=13';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -469,12 +469,17 @@ export class Player {
       this.model.root.scale.set(sxz, sy, sxz);
     }
 
-    // ---- Animated BOTW Link (FBX): real skeletal locomotion ----
+    // ---- Animated BOTW Link (FBX): baked idle + procedural walk on the rig ----
     if (this.usingAnim && this.animHero) {
-      let state = 'idle';
-      if (this.grounded && moving) state = running ? 'run' : 'walk';
-      this.animHero.setState(state);
-      this.animHero.update(dt);
+      this.animHero.update(dt); // advances the baked clip (base pose)
+      if (moving && this.grounded) {
+        this.walkPhase += dt * (running ? 16 : 10);
+        this.animHero.walk(this.walkPhase, running ? 1.25 : 1);
+      }
+      if (this.attacking) {
+        const at = THREE.MathUtils.clamp(this.attackTimer / this.attackDuration, 0, 1);
+        this.animHero.attack(at);
+      }
     }
 
     // ---- Static BOTW Link model: no skeleton, so fake a lively stride with
