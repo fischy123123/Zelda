@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=4';
-import { CharacterModel } from './CharacterModel.js?v=4';
+import { stylizeCharacter } from '../gfx/Materials.js?v=5';
+import { CharacterModel } from './CharacterModel.js?v=5';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -395,6 +395,12 @@ export class Player {
       if (this.grounded && moving) state = running ? 'run' : 'walk';
       this.model.setState(state);
       this.model.update(dt);
+
+      // Layer a sword swing onto the arm bones (after the mocap pose is applied).
+      if (this.attacking) {
+        const at = THREE.MathUtils.clamp(this.attackTimer / this.attackDuration, 0, 1);
+        this.model.applyAttackPose(at);
+      }
 
       let sy = 1, sxz = 1;
       if (!this.grounded) {

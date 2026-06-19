@@ -99,11 +99,17 @@ export class CharacterModel {
         o.material = Array.isArray(o.material) ? recol : recol[0];
       }
       if (o.isBone) {
-        if (!this.headBone && /head/i.test(o.name)) this.headBone = o;
-        if (!this.hipsBone && /hips|pelvis/i.test(o.name)) this.hipsBone = o;
+        const n = o.name.toLowerCase();
+        if (!this.headBone && /head/.test(n)) this.headBone = o;
+        if (!this.hipsBone && /hips|pelvis/.test(n)) this.hipsBone = o;
+        if (!this.rightArm && n.endsWith('rightarm')) this.rightArm = o;
+        if (!this.rightForeArm && n.endsWith('rightforearm')) this.rightForeArm = o;
+        if (!this.rightHand && n.endsWith('righthand')) this.rightHand = o;
       }
     });
     this._tmp = new THREE.Vector3();
+    this._swingAxis = new THREE.Vector3(1, 0, 0);
+    this._q = new THREE.Quaternion();
 
     const tunicMat = new THREE.MeshStandardMaterial({ color: 0x3f9140, roughness: 0.85, side: THREE.DoubleSide, flatShading: true });
     const beltMat = new THREE.MeshStandardMaterial({ color: 0x5a3a1f, roughness: 0.9 });
@@ -133,6 +139,40 @@ export class CharacterModel {
     this.tunic.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.root.add(this.tunic);
     if (!this.hipsBone) this.tunic.position.set(0, TARGET_HEIGHT * 0.5, 0);
+
+    // Put a sword in the right hand (scale-compensated to world size).
+    if (this.rightHand) {
+      const steel = new THREE.MeshStandardMaterial({ color: 0xe6edf3, metalness: 0.5, roughness: 0.3 });
+      const sword = new THREE.Group();
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 8), new THREE.MeshStandardMaterial({ color: 0x2b5fb0 }));
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.05, 0.06), goldMat);
+      guard.position.y = 0.09;
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.85, 0.02), steel);
+      blade.position.y = 0.52;
+      sword.add(grip, guard, blade);
+      sword.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      const ws = new THREE.Vector3();
+      this.rightHand.getWorldScale(ws);
+      sword.scale.setScalar(1 / (ws.x || 1));
+      this.rightHand.add(sword);
+      this.sword = sword;
+    }
+  }
+
+  // Drive a sword swing on the arm bones, layered on top of the mocap pose.
+  // t in [0,1] across the attack; call each frame *after* update().
+  applyAttackPose(t) {
+    if (!this.rightArm) return;
+    let chop;
+    if (t < 0.2) chop = THREE.MathUtils.lerp(0.2, -1.6, t / 0.2);            // wind up
+    else if (t < 0.6) chop = THREE.MathUtils.lerp(-1.6, 1.4, (t - 0.2) / 0.4); // slash down
+    else chop = THREE.MathUtils.lerp(1.4, 0, (t - 0.6) / 0.4);               // recover
+    this._q.setFromAxisAngle(this._swingAxis, chop);
+    this.rightArm.quaternion.multiply(this._q);
+    if (this.rightForeArm) {
+      this._q.setFromAxisAngle(this._swingAxis, chop * 0.4);
+      this.rightForeArm.quaternion.multiply(this._q);
+    }
   }
 
   // Smoothly cross-fade to a locomotion state: 'idle' | 'walk' | 'run'.
