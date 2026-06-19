@@ -9,7 +9,7 @@ const BASE = 'assets/link/';
 const TARGET_HEIGHT = 1.95;
 
 export class HeroModel {
-  constructor(onReady, { yawOffset = Math.PI } = {}) {
+  constructor(onReady, { yawOffset = 0 } = {}) {
     this.ready = false;
     this.root = new THREE.Group();
     this.root.rotation.y = yawOffset; // OBJ faces -Z; turn to face travel direction

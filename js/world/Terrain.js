@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainDetail } from '../gfx/Textures.js?v=10';
+import { terrainDetail } from '../gfx/Textures.js?v=11';
 
 // Lightweight, dependency-free value noise so terrain is reproducible from a seed.
 function makeNoise(seed = 1337) {

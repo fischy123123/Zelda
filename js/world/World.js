@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { Terrain } from './Terrain.js?v=10';
-import { makeTree, makeRock, makeBush, makeRuin, makeFlowers, makeDungeonEntrance } from './Props.js?v=10';
-import { Enemy } from '../entities/Enemy.js?v=10';
-import { Pickup } from '../entities/Pickup.js?v=10';
-import { Chest } from '../entities/Chest.js?v=10';
-import { SkyEnv } from '../gfx/SkyEnv.js?v=10';
-import { Grass } from '../gfx/Grass.js?v=10';
-import { Fireflies, Clouds } from '../gfx/Particles.js?v=10';
-import { waterNormal } from '../gfx/Textures.js?v=10';
+import { Terrain } from './Terrain.js?v=11';
+import { makeTree, makeRock, makeBush, makeRuin, makeFlowers, makeDungeonEntrance } from './Props.js?v=11';
+import { Enemy } from '../entities/Enemy.js?v=11';
+import { Pickup } from '../entities/Pickup.js?v=11';
+import { Chest } from '../entities/Chest.js?v=11';
+import { SkyEnv } from '../gfx/SkyEnv.js?v=11';
+import { Grass } from '../gfx/Grass.js?v=11';
+import { Fireflies, Clouds } from '../gfx/Particles.js?v=11';
+import { waterNormal } from '../gfx/Textures.js?v=11';
 
 // Builds and owns the open overworld: atmospheric sky, terrain, water, lush
 // grass, scattered props, enemies, pickups, chests, and the dungeon entrance.

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Enemy } from '../entities/Enemy.js?v=10';
-import { Chest } from '../entities/Chest.js?v=10';
-import { Pickup } from '../entities/Pickup.js?v=10';
+import { Enemy } from '../entities/Enemy.js?v=11';
+import { Chest } from '../entities/Chest.js?v=11';
+import { Pickup } from '../entities/Pickup.js?v=11';
 
 // A flat terrain stand-in so the player/enemies/camera clamp to the stone floor.
 const FLAT = {

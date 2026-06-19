@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=10';
-import { CharacterModel } from './CharacterModel.js?v=10';
-import { HeroModel } from './HeroModel.js?v=10';
+import { stylizeCharacter } from '../gfx/Materials.js?v=11';
+import { CharacterModel } from './CharacterModel.js?v=11';
+import { HeroModel } from './HeroModel.js?v=11';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -456,11 +456,22 @@ export class Player {
       this.model.root.scale.set(sxz, sy, sxz);
     }
 
-    // ---- Static BOTW Link model: glide with a subtle stride bob ----
+    // ---- Static BOTW Link model: no skeleton, so fake a lively stride with
+    // whole-body bob, forward lean, and a side-to-side rock ----
     if (this.usingHero && this.heroModel) {
-      if (moving && this.grounded) this.walkPhase += dt * (running ? 14 : 9);
-      const bob = (moving && this.grounded) ? Math.abs(Math.sin(this.walkPhase)) * 0.05 : 0;
-      this.heroModel.root.position.y = bob;
+      const root = this.heroModel.root;
+      const striding = moving && this.grounded;
+      if (striding) this.walkPhase += dt * (running ? 14 : 9);
+      const w = this.walkPhase;
+      root.position.y = striding ? Math.abs(Math.sin(w)) * 0.06 : root.position.y * 0.8;
+      const targetLean = striding ? (running ? 0.18 : 0.1) : 0;
+      let lean = targetLean;
+      if (this.attacking) {
+        const t = THREE.MathUtils.clamp(this.attackTimer / this.attackDuration, 0, 1);
+        lean += Math.sin(t * Math.PI) * 0.45; // forward lunge on a swing
+      }
+      root.rotation.x += (lean - root.rotation.x) * Math.min(1, dt * 8);
+      root.rotation.z = striding ? Math.sin(w) * 0.05 : root.rotation.z * 0.8;
     }
 
     // ---- Procedural Link: limb-swing walk cycle + subtle body bob ----
