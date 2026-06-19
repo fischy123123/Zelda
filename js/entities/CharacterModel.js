@@ -12,7 +12,7 @@ const DEFAULT_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
 const TARGET_HEIGHT = 1.95;
 
 export class CharacterModel {
-  constructor(onReady, { url = DEFAULT_URL, yawOffset = 0 } = {}) {
+  constructor(onReady, { url = DEFAULT_URL, yawOffset = Math.PI } = {}) {
     this.ready = false;
     this.mixer = null;
     this.actions = {};
@@ -45,10 +45,14 @@ export class CharacterModel {
       }
     });
 
-    // Auto-fit to the hero's height and drop feet to y = 0.
+    // Auto-fit to the hero's height and drop feet to y = 0. World matrices must
+    // be current before measuring or the box (and thus the scale) is wrong.
+    model.updateMatrixWorld(true);
     let box = new THREE.Box3().setFromObject(model);
-    const h = box.max.y - box.min.y || 1;
-    model.scale.setScalar(TARGET_HEIGHT / h);
+    let h = box.max.y - box.min.y;
+    if (!isFinite(h) || h < 0.2 || h > 100) h = 1.8; // sanity fallback
+    model.scale.multiplyScalar(TARGET_HEIGHT / h);
+    model.updateMatrixWorld(true);
     box = new THREE.Box3().setFromObject(model);
     model.position.y -= box.min.y;
 
