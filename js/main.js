@@ -1,4 +1,4 @@
-import { Game } from './core/Game.js?v=11';
+import { Game } from './core/Game.js?v=12';
 
 // Bootstraps the game and runs the render loop.
 const canvas = document.getElementById('game');

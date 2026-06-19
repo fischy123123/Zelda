@@ -1,16 +1,18 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=11';
-import { CharacterModel } from './CharacterModel.js?v=11';
-import { HeroModel } from './HeroModel.js?v=11';
+import { stylizeCharacter } from '../gfx/Materials.js?v=12';
+import { CharacterModel } from './CharacterModel.js?v=12';
+import { HeroModel } from './HeroModel.js?v=12';
+import { AnimatedHero } from './AnimatedHero.js?v=12';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
 const WALK_SPEED = 6;
 const RUN_SPEED = 11;
 
-// Use the real textured BOTW Link OBJ as the hero (static mesh). The procedural
-// Link is the fallback if it fails to load. The rigged human model stays off.
-const USE_LINK_MODEL = true;
+// Preferred hero: the rigged + animated BOTW Link FBX (real limb motion).
+// Fallbacks if it fails: static textured OBJ, then the procedural Link.
+const USE_ANIM_MODEL = true;
+const USE_LINK_MODEL = false;
 const USE_RIGGED_MODEL = false;
 
 // The hero. Built from primitives, moves relative to the camera, swings a sword,
@@ -240,9 +242,20 @@ export class Player {
     // model is an alternative experiment.
     this.usingProc = true;
     this.usingHero = false;
+    this.usingAnim = false;
     this.model = null;
     this.heroModel = null;
-    if (USE_LINK_MODEL) {
+    this.animHero = null;
+    if (USE_ANIM_MODEL) {
+      this.animHero = new AnimatedHero((m) => {
+        if (m && m.ready) {
+          this.group.add(m.root);
+          this.procRoot.visible = false;
+          this.usingProc = false;
+          this.usingAnim = true;
+        }
+      });
+    } else if (USE_LINK_MODEL) {
       this.heroModel = new HeroModel((m) => {
         if (m && m.ready) {
           this.group.add(m.root);
@@ -454,6 +467,14 @@ export class Player {
         sxz = 1 - stretch * 0.5;
       }
       this.model.root.scale.set(sxz, sy, sxz);
+    }
+
+    // ---- Animated BOTW Link (FBX): real skeletal locomotion ----
+    if (this.usingAnim && this.animHero) {
+      let state = 'idle';
+      if (this.grounded && moving) state = running ? 'run' : 'walk';
+      this.animHero.setState(state);
+      this.animHero.update(dt);
     }
 
     // ---- Static BOTW Link model: no skeleton, so fake a lively stride with
