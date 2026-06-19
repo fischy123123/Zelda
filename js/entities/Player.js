@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=8';
-import { CharacterModel } from './CharacterModel.js?v=8';
+import { stylizeCharacter } from '../gfx/Materials.js?v=9';
+import { CharacterModel } from './CharacterModel.js?v=9';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -40,11 +40,11 @@ export class Player {
   }
 
   _build() {
-    // Palette tuned to Link's Hyrule Warriors design.
+    // Palette tuned to Breath of the Wild Link (blue Champion's Tunic).
     const C = {
-      tunic: 0x35a14a, tunicDk: 0x217a31, under: 0xd8cda6, skin: 0xf2c79a,
-      hair: 0xf0cb55, belt: 0x6e4a28, buckle: 0xf3c63f, pants: 0xcabd95,
-      boot: 0x5b3a22, glove: 0x2f6fd6, bracer: 0x7a5230, scarf: 0x2f74d6,
+      tunic: 0x3f76c0, tunicDk: 0x2b5286, under: 0xe8e2c8, skin: 0xf2c79a,
+      hair: 0xf0cb55, belt: 0x6e4a28, buckle: 0xe5c23a, pants: 0xcabd95,
+      boot: 0x5b3a22, glove: 0x9c8b66, bracer: 0x7a5230, scarf: 0x2f74d6,
       scarfTip: 0xe8932a, steel: 0xe6edf3, hiltBlue: 0x2b5fb0, gold: 0xf3c63f,
       shieldBlue: 0x244fb8, shieldGold: 0xe5c23a, silver: 0xcdd5df, red: 0xc23a2e,
     };
@@ -71,9 +71,12 @@ export class Player {
     buckle.position.set(0, 0.95, 0.36);
     const pouch = box(0.14, 0.16, 0.1, C.belt);
     pouch.position.set(0.28, 0.9, 0.16);
-    this.body.add(torso, skirt, collar, belt, buckle, pouch);
+    // Champion's Tunic chest emblem (gold diamond).
+    const emblem = box(0.17, 0.17, 0.04, C.buckle, { m: 0.4, r: 0.4 });
+    emblem.position.set(0, 1.24, 0.28);
+    emblem.rotation.z = Math.PI / 4;
+    this.body.add(torso, skirt, collar, belt, buckle, pouch, emblem);
     this._buildShield(this.body, C, box, cyl);
-    this._buildScarf(this.body, C, box);
 
     // ---------- Head (bigger, expressive — Wind Waker / Hyrule Warriors feel) ----------
     this.head = new THREE.Group();
@@ -125,31 +128,40 @@ export class Player {
     nose.position.set(0, -0.08, 0.3);
     this.head.add(face, hairBack, nose);
 
-    // ---------- Cap (long pointed hat) ----------
-    const hatCone = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.55, 16), mat(C.tunic));
-    hatCone.position.set(0, 0.3, -0.03);
-    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 8, 16), mat(C.tunicDk));
-    brim.position.set(0, 0.08, 0);
-    brim.rotation.x = Math.PI / 2;
-    this.head.add(hatCone, brim);
-    // Floppy tail draping down the back, made of tapering segments.
+    // ---------- Hair: tousled blonde top + swept-back ponytail (BOTW, no hat) ----------
+    const hairTop = sph(0.31, C.hair);
+    hairTop.position.set(0, 0.13, -0.03);
+    hairTop.scale.set(1.05, 0.82, 1.02);
+    this.head.add(hairTop);
+    // A few spiky tufts on top.
+    for (let i = -1; i <= 1; i++) {
+      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 6), mat(C.hair));
+      tuft.position.set(i * 0.12, 0.32, -0.02);
+      tuft.rotation.set(-0.2, 0, i * 0.2);
+      this.head.add(tuft);
+    }
+    // Hair tie + swept ponytail (stored in capTail so it sways with motion).
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.02, 6, 12), mat(C.belt));
+    tie.position.set(0, 0.18, -0.26);
+    tie.rotation.x = Math.PI / 2;
+    this.head.add(tie);
     this.capTail = [];
     let prev = new THREE.Group();
-    prev.position.set(0, 0.34, -0.1);
+    prev.position.set(0, 0.16, -0.28);
     this.head.add(prev);
-    let segR = 0.16;
+    let segR = 0.11;
     for (let i = 0; i < 4; i++) {
       const seg = new THREE.Group();
-      const segMesh = new THREE.Mesh(new THREE.ConeGeometry(segR, 0.24, 8), mat(C.tunic));
-      segMesh.position.y = -0.12;
+      const segMesh = new THREE.Mesh(new THREE.ConeGeometry(segR, 0.18, 8), mat(C.hair));
+      segMesh.position.y = -0.09;
       segMesh.rotation.x = Math.PI;
       seg.add(segMesh);
-      seg.position.set(0, i === 0 ? 0 : -0.2, i === 0 ? 0 : -0.06);
-      seg.rotation.x = -0.7;
+      seg.position.set(0, i === 0 ? 0 : -0.14, 0);
+      seg.rotation.x = 0.85; // sweep back and down
       prev.add(seg);
       this.capTail.push(seg);
       prev = seg;
-      segR *= 0.78;
+      segR *= 0.82;
     }
 
     // ---------- Legs (rounded, pivot at hips) ----------
