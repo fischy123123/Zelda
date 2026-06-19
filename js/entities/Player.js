@@ -1,14 +1,16 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=9';
-import { CharacterModel } from './CharacterModel.js?v=9';
+import { stylizeCharacter } from '../gfx/Materials.js?v=10';
+import { CharacterModel } from './CharacterModel.js?v=10';
+import { HeroModel } from './HeroModel.js?v=10';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
 const WALK_SPEED = 6;
 const RUN_SPEED = 11;
 
-// The recognizable hand-built Link is the hero. The rigged human model looked
-// like a monster once recoloured green, so it's off by default.
+// Use the real textured BOTW Link OBJ as the hero (static mesh). The procedural
+// Link is the fallback if it fails to load. The rigged human model stays off.
+const USE_LINK_MODEL = true;
 const USE_RIGGED_MODEL = false;
 
 // The hero. Built from primitives, moves relative to the camera, swings a sword,
@@ -233,12 +235,23 @@ export class Player {
     this.slash.visible = false;
     this.group.add(this.slash);
 
-    // Keep the recognizable, hand-built Link as the hero. The rigged human model
-    // is available but recolouring it read as a "monster", so it's disabled —
-    // flip USE_RIGGED_MODEL to true to experiment with it again.
+    // The procedural Link shows immediately; swap to a higher-fidelity model
+    // once it loads. The textured BOTW Link OBJ is preferred; the rigged human
+    // model is an alternative experiment.
     this.usingProc = true;
+    this.usingHero = false;
     this.model = null;
-    if (USE_RIGGED_MODEL) {
+    this.heroModel = null;
+    if (USE_LINK_MODEL) {
+      this.heroModel = new HeroModel((m) => {
+        if (m && m.ready) {
+          this.group.add(m.root);
+          this.procRoot.visible = false;
+          this.usingProc = false;
+          this.usingHero = true;
+        }
+      });
+    } else if (USE_RIGGED_MODEL) {
       this.model = new CharacterModel((m) => {
         if (m && m.ready) {
           this.group.add(m.root);
@@ -441,6 +454,13 @@ export class Player {
         sxz = 1 - stretch * 0.5;
       }
       this.model.root.scale.set(sxz, sy, sxz);
+    }
+
+    // ---- Static BOTW Link model: glide with a subtle stride bob ----
+    if (this.usingHero && this.heroModel) {
+      if (moving && this.grounded) this.walkPhase += dt * (running ? 14 : 9);
+      const bob = (moving && this.grounded) ? Math.abs(Math.sin(this.walkPhase)) * 0.05 : 0;
+      this.heroModel.root.position.y = bob;
     }
 
     // ---- Procedural Link: limb-swing walk cycle + subtle body bob ----
