@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=6';
+import { stylizeCharacter } from '../gfx/Materials.js?v=7';
 
 // Simple enemy with patrol + chase AI. Two flavors:
 //   'chu'    — a bouncy slime (weak)

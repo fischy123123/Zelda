@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=6';
-import { CharacterModel } from './CharacterModel.js?v=6';
+import { stylizeCharacter } from '../gfx/Materials.js?v=7';
+import { CharacterModel } from './CharacterModel.js?v=7';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -50,74 +50,86 @@ export class Player {
     };
     const mat = (color, { r = 0.85, m = 0, flat = true } = {}) =>
       new THREE.MeshStandardMaterial({ color, roughness: r, metalness: m, flatShading: flat });
-    const cyl = (rt, rb, h, c, o) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 10), mat(c, o));
+    const cyl = (rt, rb, h, c, o) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), mat(c, o));
     const box = (w, h, d, c, o) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c, o));
-    const sph = (r, c, o) => new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), mat(c, o));
+    const sph = (r, c, o) => new THREE.Mesh(new THREE.SphereGeometry(r, 18, 18), mat(c, o));
+    const cap = (radius, len, c, o) => new THREE.Mesh(new THREE.CapsuleGeometry(radius, len, 6, 16), mat(c, o));
 
     // ---------- Torso (green tunic) ----------
     this.body = new THREE.Group();
-    const torso = cyl(0.27, 0.34, 0.6, C.tunic);
-    torso.position.y = 1.2;
-    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.5, 12, 1, true), mat(C.tunic));
-    skirt.position.y = 0.86;
-    const collar = cyl(0.18, 0.2, 0.12, C.under);
-    collar.position.y = 1.5;
-    const belt = cyl(0.35, 0.35, 0.13, C.belt);
-    belt.position.y = 0.96;
+    const torso = cap(0.3, 0.5, C.tunic);   // smooth rounded chest
+    torso.position.y = 1.18;
+    torso.scale.z = 0.82;
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.44, 0.58, 18, 1, true), mat(C.tunic, { flat: false }));
+    skirt.position.y = 0.92;
+    const collar = cap(0.17, 0.1, C.under);
+    collar.position.y = 1.48;
+    collar.scale.z = 0.82;
+    const belt = cyl(0.37, 0.37, 0.14, C.belt);
+    belt.position.y = 0.95;
     const buckle = box(0.16, 0.13, 0.07, C.buckle, { m: 0.4, r: 0.4 });
-    buckle.position.set(0, 0.96, 0.34);
+    buckle.position.set(0, 0.95, 0.36);
     const pouch = box(0.14, 0.16, 0.1, C.belt);
-    pouch.position.set(0.26, 0.92, 0.18);
+    pouch.position.set(0.28, 0.9, 0.16);
     this.body.add(torso, skirt, collar, belt, buckle, pouch);
     this._buildShield(this.body, C, box, cyl);
     this._buildScarf(this.body, C, box);
 
-    // ---------- Head ----------
+    // ---------- Head (bigger, expressive — Wind Waker / Hyrule Warriors feel) ----------
     this.head = new THREE.Group();
-    this.head.position.y = 1.78;
-    const face = sph(0.25, C.skin);
-    const hairBack = sph(0.26, C.hair);
-    hairBack.position.set(0, 0.05, -0.04);
-    hairBack.scale.set(1.02, 1.0, 1.0);
-    // Bangs / fringe over the forehead.
+    this.head.position.y = 1.74;
+    const face = sph(0.3, C.skin);
+    face.scale.set(1, 1.06, 0.96);
+    const hairBack = sph(0.31, C.hair);
+    hairBack.position.set(0, 0.05, -0.05);
+    hairBack.scale.set(1.03, 1.0, 0.92);
+    // Bangs / fringe poking out under the cap.
     for (let i = -2; i <= 2; i++) {
-      const bang = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 5), mat(C.hair));
-      bang.position.set(i * 0.09, 0.16, 0.2);
-      bang.rotation.x = Math.PI * 0.92;
+      const bang = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 6), mat(C.hair));
+      bang.position.set(i * 0.1, 0.2, 0.25);
+      bang.rotation.x = Math.PI * 0.9;
+      bang.rotation.z = i * 0.12;
       this.head.add(bang);
     }
-    // Sideburns.
+    // Sideburns framing the face.
     for (const sx of [-1, 1]) {
-      const sb = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 5), mat(C.hair));
-      sb.position.set(sx * 0.2, -0.04, 0.12);
+      const sb = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 6), mat(C.hair));
+      sb.position.set(sx * 0.24, -0.06, 0.14);
       sb.rotation.x = Math.PI;
       this.head.add(sb);
     }
     // Pointed elf ears.
     for (const sx of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 5), mat(C.skin));
-      ear.position.set(sx * 0.25, 0.04, 0);
-      ear.rotation.set(0, 0, sx * -1.1);
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.24, 6), mat(C.skin));
+      ear.position.set(sx * 0.3, 0.05, 0.02);
+      ear.rotation.set(0, 0, sx * -1.05);
       this.head.add(ear);
     }
-    // Eyes (white + blue iris).
+    // Big, tall anime eyes (the dark cel outline frames them) + blue irises.
     for (const sx of [-1, 1]) {
-      const white = sph(0.055, 0xffffff, { flat: false });
-      white.position.set(sx * 0.1, 0.02, 0.225);
-      white.scale.set(1, 1.3, 0.6);
-      const iris = sph(0.03, 0x2f6fd6, { flat: false });
-      iris.position.set(sx * 0.1, 0.0, 0.27);
-      this.head.add(white, iris);
+      const white = sph(0.085, 0xffffff, { flat: false });
+      white.position.set(sx * 0.12, 0.0, 0.27);
+      white.scale.set(0.72, 1.5, 0.5);
+      const iris = sph(0.05, 0x2f6fd6, { flat: false });
+      iris.position.set(sx * 0.12, -0.03, 0.32);
+      iris.scale.set(0.9, 1.2, 0.7);
+      const pupil = sph(0.022, 0x101820, { flat: false });
+      pupil.position.set(sx * 0.12, -0.04, 0.35);
+      // Eyebrow.
+      const brow = box(0.11, 0.025, 0.03, C.hair);
+      brow.position.set(sx * 0.12, 0.13, 0.29);
+      brow.rotation.z = sx * 0.12;
+      this.head.add(white, iris, pupil, brow);
     }
-    const nose = sph(0.03, C.skin, { flat: false });
-    nose.position.set(0, -0.06, 0.25);
+    const nose = sph(0.028, C.skin, { flat: false });
+    nose.position.set(0, -0.08, 0.3);
     this.head.add(face, hairBack, nose);
 
     // ---------- Cap (long pointed hat) ----------
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.29, 0.4, 10), mat(C.tunic));
-    cap.position.set(0, 0.22, -0.02);
-    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.04, 6, 12), mat(C.tunicDk));
-    brim.position.set(0, 0.05, 0);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.55, 16), mat(C.tunic));
+    cap.position.set(0, 0.3, -0.03);
+    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 8, 16), mat(C.tunicDk));
+    brim.position.set(0, 0.08, 0);
     brim.rotation.x = Math.PI / 2;
     this.head.add(cap, brim);
     // Floppy tail draping down the back, made of tapering segments.
@@ -140,35 +152,35 @@ export class Player {
       segR *= 0.78;
     }
 
-    // ---------- Legs (pivot at hips) ----------
+    // ---------- Legs (rounded, pivot at hips) ----------
     const makeLeg = () => {
       const g = new THREE.Group();
-      const pant = cyl(0.13, 0.12, 0.5, C.pants);
-      pant.position.y = -0.28;
-      const boot = cyl(0.15, 0.16, 0.32, C.boot);
+      const thigh = cap(0.14, 0.34, C.pants);
+      thigh.position.y = -0.3;
+      const boot = cap(0.15, 0.12, C.boot);
       boot.position.y = -0.64;
-      const toe = box(0.18, 0.14, 0.3, C.boot);
-      toe.position.set(0, -0.74, 0.08);
-      g.add(pant, boot, toe);
+      const toe = box(0.2, 0.13, 0.32, C.boot);
+      toe.position.set(0, -0.72, 0.1);
+      g.add(thigh, boot, toe);
       return g;
     };
-    this.legL = makeLeg(); this.legL.position.set(-0.15, 0.92, 0);
-    this.legR = makeLeg(); this.legR.position.set(0.15, 0.92, 0);
+    this.legL = makeLeg(); this.legL.position.set(-0.16, 0.92, 0);
+    this.legR = makeLeg(); this.legR.position.set(0.16, 0.92, 0);
 
-    // ---------- Arms (pivot at shoulders) ----------
+    // ---------- Arms (rounded, pivot at shoulders) ----------
     const makeArm = () => {
       const g = new THREE.Group();
-      const sleeve = cyl(0.12, 0.11, 0.3, C.tunic);
-      sleeve.position.y = -0.16;
-      const bracer = cyl(0.11, 0.1, 0.22, C.bracer);
-      bracer.position.y = -0.39;
-      const glove = sph(0.1, C.glove);
-      glove.position.y = -0.53;
-      g.add(sleeve, bracer, glove);
+      const sleeve = cap(0.12, 0.16, C.tunic);
+      sleeve.position.y = -0.18;
+      const fore = cap(0.1, 0.16, C.bracer);
+      fore.position.y = -0.42;
+      const glove = sph(0.12, C.glove);
+      glove.position.y = -0.56;
+      g.add(sleeve, fore, glove);
       return g;
     };
-    this.armL = makeArm(); this.armL.position.set(-0.4, 1.42, 0);
-    this.armR = makeArm(); this.armR.position.set(0.4, 1.42, 0);
+    this.armL = makeArm(); this.armL.position.set(-0.42, 1.42, 0);
+    this.armR = makeArm(); this.armR.position.set(0.42, 1.42, 0);
 
     // ---------- Master Sword in the right hand ----------
     this.sword = new THREE.Group();
