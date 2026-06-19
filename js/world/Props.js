@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rockTexture, barkTexture } from '../gfx/Textures.js?v=2';
+import { rockTexture, barkTexture } from '../gfx/Textures.js?v=3';
 
 // Factory functions that build low-poly props from primitives. Each returns a
 // THREE.Group already positioned on the ground via terrain.getHeightAt.

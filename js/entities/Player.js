@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=2';
-import { CharacterModel } from './CharacterModel.js?v=2';
+import { stylizeCharacter } from '../gfx/Materials.js?v=3';
+import { CharacterModel } from './CharacterModel.js?v=3';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -191,6 +191,20 @@ export class Player {
     this.walkPhase = 0;
     this.animTime = 0;
 
+    // Sword-slash VFX: a bright crescent shown during the swing's active window.
+    // Works for both the rigged and procedural models and blooms via post.
+    this.slash = new THREE.Mesh(
+      new THREE.RingGeometry(0.9, 1.55, 28, 1, Math.PI * 0.12, Math.PI * 0.8),
+      new THREE.MeshBasicMaterial({
+        color: 0xd6f2ff, transparent: true, opacity: 0,
+        side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+        depthWrite: false, toneMapped: false,
+      })
+    );
+    this.slash.position.set(0, 1.1, 1.0);
+    this.slash.visible = false;
+    this.group.add(this.slash);
+
     // Upgrade to a rigged human model with motion-captured animation. Until it
     // loads (or if it fails), the procedural model above is shown.
     this.usingProc = true;
@@ -375,10 +389,20 @@ export class Player {
     // ---- Limb animation ----
     // ---- Rigged model: drive locomotion state with mocap clips ----
     if (this.model && this.model.ready) {
+      // No jump clip exists, so airborne -> hold idle (legs stop "running") and
+      // sell the jump with squash-and-stretch on the body instead.
       let state = 'idle';
-      if (moving) state = running ? 'run' : 'walk';
+      if (this.grounded && moving) state = running ? 'run' : 'walk';
       this.model.setState(state);
       this.model.update(dt);
+
+      let sy = 1, sxz = 1;
+      if (!this.grounded) {
+        const stretch = THREE.MathUtils.clamp(this.velocityY * 0.018, -0.14, 0.16);
+        sy = 1 + stretch;
+        sxz = 1 - stretch * 0.5;
+      }
+      this.model.root.scale.set(sxz, sy, sxz);
     }
 
     // ---- Procedural fallback: limb-swing walk cycle ----
@@ -407,12 +431,27 @@ export class Player {
     if (this.attacking) {
       this.attackTimer += dt;
       const t = this.attackTimer / this.attackDuration;
+
+      // Slash crescent sweeps across and fades — clear feedback for both models.
+      if (this.slash) {
+        const active = t > 0.08 && t < 0.78;
+        this.slash.visible = active;
+        if (active) {
+          const k = (t - 0.08) / 0.7;
+          this.slash.rotation.z = 1.4 - k * 2.8;
+          this.slash.material.opacity = 0.95 * (1 - k);
+          const s = 0.85 + k * 0.6;
+          this.slash.scale.set(s, s, s);
+        }
+      }
+
       if (this.usingProc) {
         this.armR.rotation.x = -2.2 + t * 3.4;
         this.armR.rotation.z = -t * 1.2;
       }
       if (this.attackTimer >= this.attackDuration) {
         this.attacking = false;
+        if (this.slash) this.slash.visible = false;
         if (this.usingProc) this.armR.rotation.set(0, 0, 0);
       }
     }

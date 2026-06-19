@@ -57,6 +57,7 @@ export class CharacterModel {
     model.position.y -= box.min.y;
 
     this.root.add(model);
+    this._linkify(model);
 
     // Map clips by name (case-insensitive), with sensible fallbacks.
     this.mixer = new THREE.AnimationMixer(model);
@@ -78,6 +79,39 @@ export class CharacterModel {
     this.ready = true;
   }
 
+  // Best-effort "Link" pass on a generic human: tint the outfit green and add
+  // the iconic pointed green cap (tracked to the head so it moves naturally).
+  _linkify(model) {
+    const tint = new THREE.Color(0x8fd27a);
+    model.traverse((o) => {
+      if ((o.isMesh || o.isSkinnedMesh) && o.material) {
+        const list = Array.isArray(o.material) ? o.material : [o.material];
+        const tinted = list.map((m) => {
+          const c = m.clone();
+          if (c.color) c.color.multiply(tint);
+          c.roughness = 0.85;
+          c.metalness = 0.0;
+          c.envMapIntensity = 0.5;
+          return c;
+        });
+        o.material = Array.isArray(o.material) ? tinted : tinted[0];
+      }
+      if (o.isBone && !this.headBone && /head/i.test(o.name)) this.headBone = o;
+    });
+
+    const green = new THREE.MeshStandardMaterial({ color: 0x2f8f3e, roughness: 0.8, flatShading: true });
+    this.hat = new THREE.Group();
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.46, 12), green);
+    cap.position.y = 0.18;
+    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 6, 16), green);
+    brim.rotation.x = Math.PI / 2;
+    this.hat.add(cap, brim);
+    this.hat.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.root.add(this.hat);
+    this._tmp = new THREE.Vector3();
+    if (!this.headBone) this.hat.position.set(0, TARGET_HEIGHT * 0.9, 0);
+  }
+
   // Smoothly cross-fade to a locomotion state: 'idle' | 'walk' | 'run'.
   setState(name) {
     const next = this.actions[name];
@@ -87,5 +121,13 @@ export class CharacterModel {
     this.current = next;
   }
 
-  update(dt) { this.mixer?.update(dt); }
+  update(dt) {
+    this.mixer?.update(dt);
+    // Keep the cap sitting on the head as it bobs with the animation.
+    if (this.hat && this.headBone) {
+      this.headBone.getWorldPosition(this._tmp);
+      this.root.worldToLocal(this._tmp);
+      this.hat.position.set(this._tmp.x, this._tmp.y + 0.12, this._tmp.z);
+    }
+  }
 }
