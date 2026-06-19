@@ -82,34 +82,57 @@ export class CharacterModel {
   // Best-effort "Link" pass on a generic human: tint the outfit green and add
   // the iconic pointed green cap (tracked to the head so it moves naturally).
   _linkify(model) {
-    const tint = new THREE.Color(0x8fd27a);
+    // Recolour the whole figure to a tunic green (kills the camo/military read)
+    // and grab the head + hips bones so we can attach Link-shaped clothing.
+    const green = new THREE.Color(0x4e9e3f);
     model.traverse((o) => {
       if ((o.isMesh || o.isSkinnedMesh) && o.material) {
         const list = Array.isArray(o.material) ? o.material : [o.material];
-        const tinted = list.map((m) => {
+        const recol = list.map((m) => {
           const c = m.clone();
-          if (c.color) c.color.multiply(tint);
+          if (c.color) c.color.copy(green);
           c.roughness = 0.85;
           c.metalness = 0.0;
           c.envMapIntensity = 0.5;
           return c;
         });
-        o.material = Array.isArray(o.material) ? tinted : tinted[0];
+        o.material = Array.isArray(o.material) ? recol : recol[0];
       }
-      if (o.isBone && !this.headBone && /head/i.test(o.name)) this.headBone = o;
+      if (o.isBone) {
+        if (!this.headBone && /head/i.test(o.name)) this.headBone = o;
+        if (!this.hipsBone && /hips|pelvis/i.test(o.name)) this.hipsBone = o;
+      }
     });
+    this._tmp = new THREE.Vector3();
 
-    const green = new THREE.MeshStandardMaterial({ color: 0x2f8f3e, roughness: 0.8, flatShading: true });
+    const tunicMat = new THREE.MeshStandardMaterial({ color: 0x3f9140, roughness: 0.85, side: THREE.DoubleSide, flatShading: true });
+    const beltMat = new THREE.MeshStandardMaterial({ color: 0x5a3a1f, roughness: 0.9 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xe5c23a, metalness: 0.4, roughness: 0.4 });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x2f8f3e, roughness: 0.8, flatShading: true });
+
+    // Iconic pointed cap.
     this.hat = new THREE.Group();
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.46, 12), green);
-    cap.position.y = 0.18;
-    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 6, 16), green);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.5, 12), capMat);
+    cap.position.y = 0.2;
+    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 6, 16), capMat);
     brim.rotation.x = Math.PI / 2;
     this.hat.add(cap, brim);
     this.hat.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.root.add(this.hat);
-    this._tmp = new THREE.Vector3();
     if (!this.headBone) this.hat.position.set(0, TARGET_HEIGHT * 0.9, 0);
+
+    // Flared tunic skirt + belt to reshape the military silhouette into Link's.
+    this.tunic = new THREE.Group();
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.6, 18, 1, true), tunicMat);
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 20), beltMat);
+    belt.rotation.x = Math.PI / 2;
+    belt.position.y = 0.26;
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.05), goldMat);
+    buckle.position.set(0, 0.26, 0.3);
+    this.tunic.add(skirt, belt, buckle);
+    this.tunic.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.root.add(this.tunic);
+    if (!this.hipsBone) this.tunic.position.set(0, TARGET_HEIGHT * 0.5, 0);
   }
 
   // Smoothly cross-fade to a locomotion state: 'idle' | 'walk' | 'run'.
@@ -123,11 +146,16 @@ export class CharacterModel {
 
   update(dt) {
     this.mixer?.update(dt);
-    // Keep the cap sitting on the head as it bobs with the animation.
+    // Keep the cap on the head and the tunic at the hips as they move.
     if (this.hat && this.headBone) {
       this.headBone.getWorldPosition(this._tmp);
       this.root.worldToLocal(this._tmp);
-      this.hat.position.set(this._tmp.x, this._tmp.y + 0.12, this._tmp.z);
+      this.hat.position.set(this._tmp.x, this._tmp.y + 0.16, this._tmp.z);
+    }
+    if (this.tunic && this.hipsBone) {
+      this.hipsBone.getWorldPosition(this._tmp);
+      this.root.worldToLocal(this._tmp);
+      this.tunic.position.set(this._tmp.x, this._tmp.y - 0.02, this._tmp.z);
     }
   }
 }

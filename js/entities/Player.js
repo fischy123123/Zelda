@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=3';
-import { CharacterModel } from './CharacterModel.js?v=3';
+import { stylizeCharacter } from '../gfx/Materials.js?v=4';
+import { CharacterModel } from './CharacterModel.js?v=4';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
