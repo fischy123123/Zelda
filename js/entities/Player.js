@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { stylizeCharacter } from '../gfx/Materials.js';
+import { CharacterModel } from './CharacterModel.js';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -180,12 +181,26 @@ export class Player {
     this.sword.position.set(0.02, -0.55, 0.05);
     this.armR.add(this.sword);
 
-    this.group.add(this.body, this.head, this.legL, this.legR, this.armL, this.armR);
-    this.group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    // Cel-shade the whole hero with crisp silhouette outlines.
-    stylizeCharacter(this.group, { thickness: 0.04 });
+    // Procedural model lives under its own root so it can be hidden once the
+    // rigged human model loads.
+    this.procRoot = new THREE.Group();
+    this.procRoot.add(this.body, this.head, this.legL, this.legR, this.armL, this.armR);
+    this.group.add(this.procRoot);
+    this.procRoot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    stylizeCharacter(this.procRoot, { thickness: 0.04 });
     this.walkPhase = 0;
     this.animTime = 0;
+
+    // Upgrade to a rigged human model with motion-captured animation. Until it
+    // loads (or if it fails), the procedural model above is shown.
+    this.usingProc = true;
+    this.model = new CharacterModel((m) => {
+      if (m && m.ready) {
+        this.group.add(m.root);
+        this.procRoot.visible = false;
+        this.usingProc = false;
+      }
+    });
   }
 
   // Hylian Shield worn on the back.
@@ -358,39 +373,53 @@ export class Player {
     this.group.rotation.y += diff * Math.min(1, dt * 12);
 
     // ---- Limb animation ----
-    if (moving && this.grounded) {
-      this.walkPhase += dt * (running ? 16 : 10);
-      const swing = Math.sin(this.walkPhase) * 0.6;
-      this.legL.rotation.x = swing;
-      this.legR.rotation.x = -swing;
-      if (!this.attacking) {
-        this.armL.rotation.x = -swing;
-        this.armR.rotation.x = swing;
-      }
-    } else {
-      this.legL.rotation.x *= 0.8;
-      this.legR.rotation.x *= 0.8;
-      if (!this.attacking) {
-        this.armL.rotation.x *= 0.8;
-        this.armR.rotation.x *= 0.8;
+    // ---- Rigged model: drive locomotion state with mocap clips ----
+    if (this.model && this.model.ready) {
+      let state = 'idle';
+      if (moving) state = running ? 'run' : 'walk';
+      this.model.setState(state);
+      this.model.update(dt);
+    }
+
+    // ---- Procedural fallback: limb-swing walk cycle ----
+    if (this.usingProc) {
+      if (moving && this.grounded) {
+        this.walkPhase += dt * (running ? 16 : 10);
+        const swing = Math.sin(this.walkPhase) * 0.6;
+        this.legL.rotation.x = swing;
+        this.legR.rotation.x = -swing;
+        if (!this.attacking) {
+          this.armL.rotation.x = -swing;
+          this.armR.rotation.x = swing;
+        }
+      } else {
+        this.legL.rotation.x *= 0.8;
+        this.legR.rotation.x *= 0.8;
+        if (!this.attacking) {
+          this.armL.rotation.x *= 0.8;
+          this.armR.rotation.x *= 0.8;
+        }
       }
     }
 
-    // ---- Sword swing animation ----
+    // ---- Sword swing: always advance the timer (combat needs it); only pose
+    // the procedural arm when the procedural model is shown. ----
     if (this.attacking) {
       this.attackTimer += dt;
       const t = this.attackTimer / this.attackDuration;
-      // Wind up then slash down-and-across.
-      this.armR.rotation.x = -2.2 + t * 3.4;
-      this.armR.rotation.z = -t * 1.2;
+      if (this.usingProc) {
+        this.armR.rotation.x = -2.2 + t * 3.4;
+        this.armR.rotation.z = -t * 1.2;
+      }
       if (this.attackTimer >= this.attackDuration) {
         this.attacking = false;
-        this.armR.rotation.set(0, 0, 0);
+        if (this.usingProc) this.armR.rotation.set(0, 0, 0);
       }
     }
 
     // ---- Cloth sway: scarf + cap tail drift with motion and a gentle breeze ----
     this.animTime += dt;
+    if (this.usingProc) {
     const gait = moving ? (running ? 1.6 : 1.0) : 0.4;
     const flow = Math.sin(this.animTime * 6) * 0.08 * gait + Math.sin(this.animTime * 2.1) * 0.05;
     if (this.scarfSegs) {
@@ -403,6 +432,7 @@ export class Player {
       for (let i = 0; i < this.capTail.length; i++) {
         this.capTail[i].rotation.z = flow * (i + 1) * 0.4;
       }
+    }
     }
 
     // ---- Timers ----

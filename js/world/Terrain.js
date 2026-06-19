@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { terrainDetail } from '../gfx/Textures.js';
 
 // Lightweight, dependency-free value noise so terrain is reproducible from a seed.
 function makeNoise(seed = 1337) {
@@ -117,12 +118,20 @@ export class Terrain {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geo.computeVertexNormals();
 
+    // Procedural surface detail + normal map multiplied by the per-vertex biome
+    // colours, so the ground reads as textured earth rather than flat colour.
+    const det = terrainDetail();
+    det.map.repeat.set(64, 64);
+    det.normal.repeat.set(64, 64);
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.92,
+      map: det.map,
+      normalMap: det.normal,
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      roughness: 0.95,
       metalness: 0.0,
       flatShading: false, // smooth, rolling hills rather than blocky facets
-      envMapIntensity: 0.35,
+      envMapIntensity: 0.3,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;

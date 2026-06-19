@@ -88,8 +88,15 @@ geometry — no external textures or models:
 - **Atmospheric sky** — a custom gradient sky-dome shader with a soft glowing
   sun, matched sun/sky lighting, and a baked environment map for reflections on
   water, metal, and gems (`js/gfx/SkyEnv.js`).
-- **Cel-shaded characters** — toon gradient shading with crisp inverted-hull
-  silhouette outlines on the hero and enemies (`js/gfx/Materials.js`).
+- **Rigged human hero** — a real skinned glTF character with motion-captured
+  Idle/Walk/Run animation, auto-fitted and cross-faded by movement speed
+  (`js/entities/CharacterModel.js`). Falls back to a cel-shaded procedural Link
+  if the model can't load.
+- **Procedural PBR textures** — tileable albedo + normal maps for ground, rock,
+  bark, and water ripples, generated at load time so there are no external
+  downloads (`js/gfx/Textures.js`).
+- **Cel-shaded fallback characters** — toon gradient shading with crisp
+  inverted-hull outlines on enemies and the fallback hero (`js/gfx/Materials.js`).
 - **Living world** — 16k wind-animated instanced grass blades, swaying tree
   crowns, colourful flower clusters, rippling reflective water, drifting clouds,
   and glowing fireflies (`js/gfx/Grass.js`, `js/gfx/Particles.js`).

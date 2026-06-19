@@ -41,7 +41,7 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Cinematic colour grading: filmic tone mapping in linear-sRGB.
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();

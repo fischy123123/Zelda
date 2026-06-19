@@ -7,6 +7,7 @@ import { Chest } from '../entities/Chest.js';
 import { SkyEnv } from '../gfx/SkyEnv.js';
 import { Grass } from '../gfx/Grass.js';
 import { Fireflies, Clouds } from '../gfx/Particles.js';
+import { waterNormal } from '../gfx/Textures.js';
 
 // Builds and owns the open overworld: atmospheric sky, terrain, water, lush
 // grass, scattered props, enemies, pickups, chests, and the dungeon entrance.
@@ -26,7 +27,7 @@ export class World {
     this.swayables = [];          // tree crowns that bend in the wind
 
     // ---- Sky, light, environment ----
-    this.sky = new SkyEnv(renderer, { elevationDeg: 28, azimuthDeg: 135, shadowMapSize: this.quality.shadowMap });
+    this.sky = new SkyEnv(renderer, { elevationDeg: 22, azimuthDeg: 125, shadowMapSize: this.quality.shadowMap });
     this.environment = this.sky.environment;
     this.background = this.sky.fogColor.clone();
     this.fog = new THREE.FogExp2(this.sky.fogColor.getHex(), 0.0026);
@@ -50,6 +51,8 @@ export class World {
     // shader; reflections come from the scene environment map.
     const geo = new THREE.PlaneGeometry(this.terrain.size, this.terrain.size, 96, 96);
     geo.rotateX(-Math.PI / 2);
+    const wnorm = waterNormal();
+    wnorm.repeat.set(14, 14);
     const mat = new THREE.MeshStandardMaterial({
       color: 0x2b86c5,
       transparent: true,
@@ -57,7 +60,10 @@ export class World {
       roughness: 0.12,
       metalness: 0.0,
       envMapIntensity: 1.2,
+      normalMap: wnorm,
+      normalScale: new THREE.Vector2(0.35, 0.35),
     });
+    this.waterNormalTex = wnorm;
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = { value: 0 };
       mat.userData.shader = shader;
@@ -210,6 +216,10 @@ export class World {
     // Animated water + grass + clouds + fireflies.
     if (this.water?.material.userData.shader) {
       this.water.material.userData.shader.uniforms.uTime.value = elapsed;
+    }
+    if (this.waterNormalTex) {
+      this.waterNormalTex.offset.x = elapsed * 0.03;
+      this.waterNormalTex.offset.y = elapsed * 0.02;
     }
     this.grass?.update(elapsed);
     this.clouds?.update(dt);

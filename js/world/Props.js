@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rockTexture, barkTexture } from '../gfx/Textures.js';
 
 // Factory functions that build low-poly props from primitives. Each returns a
 // THREE.Group already positioned on the ground via terrain.getHeightAt.
@@ -7,9 +8,13 @@ export function makeTree(x, z, terrain) {
   const g = new THREE.Group();
   const trunkH = 2.6 + Math.random() * 1.8;
 
+  const bark = barkTexture();
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.2, 0.36, trunkH, 7),
-    new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1, flatShading: true })
+    new THREE.CylinderGeometry(0.2, 0.36, trunkH, 10),
+    new THREE.MeshStandardMaterial({
+      color: 0x8a6038, map: bark.map, normalMap: bark.normal,
+      normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.95,
+    })
   );
   trunk.position.y = trunkH / 2;
   trunk.castShadow = true;
@@ -71,9 +76,13 @@ export function makeFlowers(x, z, terrain) {
 
 export function makeRock(x, z, terrain) {
   const s = 0.6 + Math.random() * 1.4;
+  const rt = rockTexture();
   const rock = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(s, 0),
-    new THREE.MeshStandardMaterial({ color: 0x7d7f86, roughness: 1, flatShading: true })
+    new THREE.IcosahedronGeometry(s, 1),
+    new THREE.MeshStandardMaterial({
+      color: 0x9a9b9e, map: rt.map, normalMap: rt.normal,
+      normalScale: new THREE.Vector2(1.0, 1.0), roughness: 1, flatShading: true,
+    })
   );
   rock.position.set(x, terrain.getHeightAt(x, z) + s * 0.4, z);
   rock.rotation.set(Math.random(), Math.random(), Math.random());

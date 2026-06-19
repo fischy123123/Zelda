@@ -38,10 +38,10 @@ export class SkyEnv {
   constructor(renderer, {
     elevationDeg = 26,
     azimuthDeg = 135,
-    topColor = 0x2a6cd6,
-    horizonColor = 0xcfe8ff,
-    groundColor = 0x9fb88a,
-    sunColor = 0xfff3d0,
+    topColor = 0x3a7bd0,
+    horizonColor = 0xf2d6a8,   // warm late-afternoon haze
+    groundColor = 0x8f9a64,
+    sunColor = 0xffe1a0,
     shadowMapSize = 4096,
   } = {}) {
     this.sunDir = new THREE.Vector3().setFromSphericalCoords(
@@ -72,7 +72,7 @@ export class SkyEnv {
     this.mesh.frustumCulled = false;
 
     // ---- Lights matched to the sky ----
-    this.sun = new THREE.DirectionalLight(0xfff1d4, 2.4);
+    this.sun = new THREE.DirectionalLight(0xffe6b0, 2.7);
     this.sun.position.copy(this.sunDir).multiplyScalar(120);
     this.sun.castShadow = true;
     // High-res shadow map with a tight frustum (it follows the player) for
