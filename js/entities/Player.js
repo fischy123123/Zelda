@@ -1,11 +1,15 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=5';
-import { CharacterModel } from './CharacterModel.js?v=5';
+import { stylizeCharacter } from '../gfx/Materials.js?v=6';
+import { CharacterModel } from './CharacterModel.js?v=6';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
 const WALK_SPEED = 6;
 const RUN_SPEED = 11;
+
+// The recognizable hand-built Link is the hero. The rigged human model looked
+// like a monster once recoloured green, so it's off by default.
+const USE_RIGGED_MODEL = false;
 
 // The hero. Built from primitives, moves relative to the camera, swings a sword,
 // jumps with gravity, and is clamped to the terrain. Health is tracked in
@@ -205,16 +209,20 @@ export class Player {
     this.slash.visible = false;
     this.group.add(this.slash);
 
-    // Upgrade to a rigged human model with motion-captured animation. Until it
-    // loads (or if it fails), the procedural model above is shown.
+    // Keep the recognizable, hand-built Link as the hero. The rigged human model
+    // is available but recolouring it read as a "monster", so it's disabled —
+    // flip USE_RIGGED_MODEL to true to experiment with it again.
     this.usingProc = true;
-    this.model = new CharacterModel((m) => {
-      if (m && m.ready) {
-        this.group.add(m.root);
-        this.procRoot.visible = false;
-        this.usingProc = false;
-      }
-    });
+    this.model = null;
+    if (USE_RIGGED_MODEL) {
+      this.model = new CharacterModel((m) => {
+        if (m && m.ready) {
+          this.group.add(m.root);
+          this.procRoot.visible = false;
+          this.usingProc = false;
+        }
+      });
+    }
   }
 
   // Hylian Shield worn on the back.
@@ -411,7 +419,7 @@ export class Player {
       this.model.root.scale.set(sxz, sy, sxz);
     }
 
-    // ---- Procedural fallback: limb-swing walk cycle ----
+    // ---- Procedural Link: limb-swing walk cycle + subtle body bob ----
     if (this.usingProc) {
       if (moving && this.grounded) {
         this.walkPhase += dt * (running ? 16 : 10);
@@ -422,6 +430,8 @@ export class Player {
           this.armL.rotation.x = -swing;
           this.armR.rotation.x = swing;
         }
+        // Gentle up-down bob in time with the stride.
+        this.procRoot.position.y = Math.abs(Math.sin(this.walkPhase)) * 0.06;
       } else {
         this.legL.rotation.x *= 0.8;
         this.legR.rotation.x *= 0.8;
@@ -429,6 +439,7 @@ export class Player {
           this.armL.rotation.x *= 0.8;
           this.armR.rotation.x *= 0.8;
         }
+        this.procRoot.position.y *= 0.8;
       }
     }
 
