@@ -4,7 +4,7 @@ export class Input {
     this.canvas = canvas;
     this.keys = new Set();
     this.pressed = new Set();   // edge-triggered: true only on the frame a key goes down
-    this.mouse = { dx: 0, dy: 0, down: false, clicked: false };
+    this.mouse = { dx: 0, dy: 0, down: false, clicked: false, rightDown: false };
     this.pointerLocked = false;
 
     // Touch / virtual-gamepad state (driven by TouchControls on phones/tablets).
@@ -16,18 +16,24 @@ export class Input {
       const code = e.code;
       if (!this.keys.has(code)) this.pressed.add(code);
       this.keys.add(code);
-      // Prevent the page from scrolling on space / arrows while playing.
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
+      // Prevent scrolling / focus-cycling on game keys.
+      if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
         e.preventDefault();
       }
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
 
-    canvas.addEventListener('mousedown', () => {
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 2) { this.mouse.rightDown = true; return; }
       this.mouse.down = true;
       this.mouse.clicked = true;
     });
-    window.addEventListener('mouseup', () => { this.mouse.down = false; });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 2) this.mouse.rightDown = false;
+      else this.mouse.down = false;
+    });
+    // Right-click is "raise shield", not a context menu.
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     canvas.addEventListener('mousemove', (e) => {
       if (this.pointerLocked) {
@@ -47,6 +53,9 @@ export class Input {
   }
 
   isDown(code) { return this.keys.has(code); }
+
+  // Shield guard: hold Q, right mouse button, or the touch shield button.
+  get blockHeld() { return this.keys.has('KeyQ') || this.mouse.rightDown; }
 
   // True only on the first frame the key was pressed this update.
   wasPressed(code) { return this.pressed.has(code); }

@@ -110,7 +110,10 @@ export class TouchControls {
     this._button('⚔', 'btn-attack', 'KeyF');
     this._button('↥', 'btn-jump', 'Space');
     this._button('E', 'btn-interact', 'KeyE');
-    // Run toggle held while pressed.
+    this._button('⟳', 'btn-roll', 'KeyC');           // dodge roll
+    this._button('🛡', 'btn-block', 'KeyQ', true);    // hold to guard
+    this._button('🎯', 'btn-lock', 'Tab');            // Z-target lock-on
+    // Run held while pressed.
     this._button('»', 'btn-run', 'ShiftLeft', true);
     // Corner buttons.
     this._button('🎒', 'btn-inv', 'KeyI');

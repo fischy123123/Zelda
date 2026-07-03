@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=13';
-import { CharacterModel } from './CharacterModel.js?v=13';
-import { HeroModel } from './HeroModel.js?v=13';
-import { AnimatedHero } from './AnimatedHero.js?v=13';
+import { stylizeCharacter } from '../gfx/Materials.js?v=14';
+import { CharacterModel } from './CharacterModel.js?v=14';
+import { HeroModel } from './HeroModel.js?v=14';
+import { AnimatedHero } from './AnimatedHero.js?v=14';
 
 const GRAVITY = -28;
 const JUMP_SPEED = 11;
@@ -38,7 +38,19 @@ export class Player {
     this.swordDamage = 1;
     this.hasShield = false;
 
+    // Zelda-style combat state: stamina, dodge roll, shield block, Z-target.
+    this.maxStamina = 100;
+    this.stamina = 100;
+    this.exhausted = false;
+    this.blocking = false;
+    this.rolling = -1;            // >=0 while mid-roll (elapsed seconds)
+    this.rollDir = new THREE.Vector3();
+    this.justRolled = false;
+    this.lockTarget = null;       // enemy faced while Z-targeted
+    this.isMoving = false;
+
     this.group = new THREE.Group();
+    this.group.rotation.order = 'YXZ'; // yaw first so the roll flips forward
     this._build();
     this.group.position.set(0, terrain.getHeightAt(0, 0), 0);
   }
@@ -237,6 +249,18 @@ export class Player {
     this.slash.visible = false;
     this.group.add(this.slash);
 
+    // Shield-guard shimmer shown while blocking.
+    this.blockDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.6, 20),
+      new THREE.MeshBasicMaterial({
+        color: 0x7ab8ff, transparent: true, opacity: 0.4,
+        side: THREE.DoubleSide, depthWrite: false,
+      })
+    );
+    this.blockDisc.position.set(0, 1.05, 0.78);
+    this.blockDisc.visible = false;
+    this.group.add(this.blockDisc);
+
     // The procedural Link shows immediately; swap to a higher-fidelity model
     // once it loads. The textured BOTW Link OBJ is preferred; the rigged human
     // model is an alternative experiment.
@@ -358,10 +382,23 @@ export class Player {
     return { center, radius: 1.3 };
   }
 
+  // Returns 'immune' | 'blocked' | 'hit' so the caller can react (sfx, shake).
   takeDamage(amount, fromPos) {
-    if (this.invuln > 0) return;
+    if (this.invuln > 0) return 'immune';
+    // An actively raised shield absorbs frontal blows entirely.
+    if (this.blocking && fromPos) {
+      const toAttacker = new THREE.Vector3().subVectors(fromPos, this.group.position);
+      toAttacker.y = 0;
+      toAttacker.normalize();
+      const facingDir = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
+      if (facingDir.dot(toAttacker) > 0.25) {
+        this.invuln = 0.35;
+        this.knockback.copy(facingDir).multiplyScalar(-3.2); // slide back a step
+        return 'blocked';
+      }
+    }
     let dmg = amount;
-    // A raised shield halves incoming damage (rounded down, min 1 unit lands).
+    // A carried (but not raised) shield still halves incoming damage.
     if (this.hasShield) dmg = Math.max(1, Math.floor(dmg / 2));
     this.health = Math.max(0, this.health - dmg);
     this.invuln = 1.0;
@@ -371,6 +408,7 @@ export class Player {
       kb.normalize().multiplyScalar(7);
       this.knockback.copy(kb);
     }
+    return 'hit';
   }
 
   heal(amount) {
@@ -396,19 +434,52 @@ export class Player {
       move.addScaledVector(right, tm.x);
     }
 
-    const running = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
-    const maxSpeed = running ? RUN_SPEED : WALK_SPEED;
+    // ---- Blocking, stamina-limited sprint ----
+    this.blocking = !!(this.hasShield && input.blockHeld && this.grounded
+      && !this.attacking && this.rolling < 0);
+    let running = (input.isDown('ShiftLeft') || input.isDown('ShiftRight'))
+      && !this.exhausted && !this.blocking;
     const pos = this.group.position;
 
     let moving = false;
     const mag = Math.min(1, move.length());
-    if (mag > 0.05) {
+    if (mag > 0.05 && this.rolling < 0) {
       move.normalize();
-      const speed = maxSpeed * mag;
+      let speed = (running ? RUN_SPEED : WALK_SPEED) * mag;
+      if (this.blocking) speed *= 0.45;
       pos.x += move.x * speed * dt;
       pos.z += move.z * speed * dt;
-      this.facing = Math.atan2(move.x, move.z);
+      if (!this.lockTarget) this.facing = Math.atan2(move.x, move.z);
       moving = true;
+    }
+    this.isMoving = moving;
+
+    // Sprinting drains stamina; resting refills it. Empty = forced walk.
+    if (running && moving && this.grounded) {
+      this.stamina -= 16 * dt;
+      if (this.stamina <= 0) { this.stamina = 0; this.exhausted = true; running = false; }
+    } else {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 22 * dt);
+      if (this.exhausted && this.stamina >= 30) this.exhausted = false;
+    }
+
+    // ---- Dodge roll: a quick invulnerable burst with a forward flip ----
+    if (this.rolling < 0 && this.grounded && !this.exhausted && this.stamina >= 20
+        && (input.wasPressed('KeyC') || input.wasPressed('ControlLeft'))) {
+      this.rolling = 0;
+      this.stamina -= 20;
+      this.justRolled = true;
+      if (moving) this.rollDir.copy(move);
+      else this.rollDir.set(Math.sin(this.facing), 0, Math.cos(this.facing));
+    }
+    if (this.rolling >= 0) {
+      this.rolling += dt;
+      const p = Math.min(1, this.rolling / 0.38);
+      pos.x += this.rollDir.x * 11 * (1.25 - p) * dt;
+      pos.z += this.rollDir.z * 11 * (1.25 - p) * dt;
+      this.invuln = Math.max(this.invuln, 0.12);
+      this.group.rotation.x = -p * Math.PI * 2;
+      if (this.rolling >= 0.38) { this.rolling = -1; this.group.rotation.x = 0; }
     }
 
     // Apply and decay knockback.
@@ -435,6 +506,12 @@ export class Player {
       pos.y = groundY;
       this.velocityY = 0;
       this.grounded = true;
+    }
+
+    // Z-target: always square up to the locked enemy (movement strafes).
+    if (this.lockTarget && !this.lockTarget.dead) {
+      const m = this.lockTarget.mesh.position;
+      this.facing = Math.atan2(m.x - pos.x, m.z - pos.z);
     }
 
     // Face movement direction smoothly.
@@ -572,9 +649,10 @@ export class Player {
     }
     }
 
-    // ---- Timers ----
+    // ---- Timers / state visuals ----
     this.invuln = Math.max(0, this.invuln - dt);
-    // Blink while invulnerable.
-    this.group.visible = !(this.invuln > 0 && Math.floor(this.invuln * 12) % 2 === 0);
+    if (this.blockDisc) this.blockDisc.visible = this.blocking;
+    // Blink while invulnerable (but not during the roll's brief i-frames).
+    this.group.visible = !(this.invuln > 0.2 && Math.floor(this.invuln * 12) % 2 === 0);
   }
 }

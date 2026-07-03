@@ -1,54 +1,79 @@
 import * as THREE from 'three';
-import { Terrain } from './Terrain.js?v=13';
-import { makeTree, makeRock, makeBush, makeRuin, makeFlowers, makeDungeonEntrance } from './Props.js?v=13';
-import { Enemy } from '../entities/Enemy.js?v=13';
-import { Pickup } from '../entities/Pickup.js?v=13';
-import { Chest } from '../entities/Chest.js?v=13';
-import { SkyEnv } from '../gfx/SkyEnv.js?v=13';
-import { Grass } from '../gfx/Grass.js?v=13';
-import { Fireflies, Clouds } from '../gfx/Particles.js?v=13';
-import { waterNormal } from '../gfx/Textures.js?v=13';
+import { Terrain } from './Terrain.js?v=14';
+import { makeTree, makeRock, makeBush, makeRuin, makeFlowers, makeDungeonEntrance, makeCampfire } from './Props.js?v=14';
+import { Village } from './Village.js?v=14';
+import { Enemy } from '../entities/Enemy.js?v=14';
+import { Pickup } from '../entities/Pickup.js?v=14';
+import { Chest } from '../entities/Chest.js?v=14';
+import { SkyEnv } from '../gfx/SkyEnv.js?v=14';
+import { Grass } from '../gfx/Grass.js?v=14';
+import { Fireflies, Clouds } from '../gfx/Particles.js?v=14';
+import { waterNormal } from '../gfx/Textures.js?v=14';
 
-// Builds and owns the open overworld: atmospheric sky, terrain, water, lush
-// grass, scattered props, enemies, pickups, chests, and the dungeon entrance.
+const DAY_LENGTH = 480; // seconds for a full day/night cycle
+
+// The open overworld: dynamic sky with a day/night cycle, terrain, water, lush
+// grass, Hylia Village with NPCs, moblin camps, named regions, props, enemies,
+// pickups, chests, and the vault entrance.
 export class World {
   constructor(renderer, quality = {}) {
     this.name = 'overworld';
     this.quality = {
-      grass: 16000, shadowMap: 4096, propScale: 1, fireflies: 200, ...quality,
+      grass: 16000, shadowMap: 4096, propScale: 1, fireflies: 200, lights: true, ...quality,
     };
     this.terrain = new Terrain({ size: 400, segments: 320, maxHeight: 22, seed: 7 });
     this.group = new THREE.Group();
     this.enemies = [];
     this.pickups = [];
     this.chests = [];
-    this.colliders = [];          // overworld is open; props are non-blocking
+    this.colliders = [];
     this.interactables = [];
-    this.swayables = [];          // tree crowns that bend in the wind
+    this.swayables = [];
+    this.flickers = [];
 
-    // ---- Sky, light, environment ----
-    this.sky = new SkyEnv(renderer, { elevationDeg: 22, azimuthDeg: 125, shadowMapSize: this.quality.shadowMap });
+    // ---- Sky, light, environment (dynamic day/night) ----
+    this.sky = new SkyEnv(renderer, { shadowMapSize: this.quality.shadowMap });
     this.environment = this.sky.environment;
     this.background = this.sky.fogColor.clone();
     this.fog = new THREE.FogExp2(this.sky.fogColor.getHex(), 0.0026);
     this.group.add(this.sky.mesh, this.sky.sun, this.sky.sun.target, this.sky.hemi, this.sky.fill);
+    this.dayTime = 0.3; // mid-morning start
+    this.dayFactor = 1;
 
     this.spawn = new THREE.Vector3(0, this.terrain.getHeightAt(0, 0), 0);
+
+    // Named regions (checked in order; falls through to a quadrant name).
+    this.regions = [
+      { name: 'Hylia Village', x: 0, z: 0, r: 24 },
+      { name: 'The Sunken Vault', x: 48, z: -34, r: 15 },
+      { name: 'Verdant Meadow', x: 0, z: 0, r: 78 },
+    ];
 
     this.group.add(this.terrain.mesh);
     this._buildWater();
     this._buildGrass();
+    this._buildVillage();
     this._scatterProps();
     this._buildClouds();
     this._buildFireflies();
     this._buildDungeonEntrance();
     this._spawnEnemies();
+    this._spawnCamps();
     this._spawnLoot();
   }
 
+  get isNight() { return this.dayFactor < 0.4; }
+
+  regionAt(p) {
+    for (const r of this.regions) {
+      const dx = p.x - r.x, dz = p.z - r.z;
+      if (dx * dx + dz * dz < r.r * r.r) return r.name;
+    }
+    if (Math.abs(p.x) > Math.abs(p.z)) return p.x > 0 ? 'Emberpeak Foothills' : 'Westwood Thicket';
+    return p.z > 0 ? 'Sunmere Shores' : 'Northwind Steppe';
+  }
+
   _buildWater() {
-    // A rippling, reflective water plane. Waves are injected into the vertex
-    // shader; reflections come from the scene environment map.
     const geo = new THREE.PlaneGeometry(this.terrain.size, this.terrain.size, 96, 96);
     geo.rotateX(-Math.PI / 2);
     const wnorm = waterNormal();
@@ -90,8 +115,15 @@ export class World {
     this.group.add(this.grass.mesh);
   }
 
+  _buildVillage() {
+    this.village = new Village(this.terrain, { lights: this.quality.lights });
+    this.group.add(this.village.group);
+    this.colliders.push(...this.village.colliders);
+    this.interactables.push(...this.village.interactables);
+  }
+
   _buildClouds() {
-    this.clouds = new Clouds({ count: 16 });
+    this.clouds = new Clouds({ count: 14 });
     this.group.add(this.clouds.group);
   }
 
@@ -100,7 +132,6 @@ export class World {
     this.group.add(this.fireflies.points);
   }
 
-  // Reject spots that are underwater or too close to the spawn meadow.
   _validSpot(minR = 18, maxR = 185) {
     for (let tries = 0; tries < 12; tries++) {
       const a = Math.random() * Math.PI * 2;
@@ -115,7 +146,7 @@ export class World {
   _scatterProps() {
     const propCount = Math.round(300 * this.quality.propScale);
     for (let i = 0; i < propCount; i++) {
-      const spot = this._validSpot(12);
+      const spot = this._validSpot(20);
       if (!spot) continue;
       const h = this.terrain.getHeightAt(spot.x, spot.z);
       let prop;
@@ -129,14 +160,12 @@ export class World {
       if (prop.userData.sway) this.swayables.push(prop.userData.sway);
       this.group.add(prop);
     }
-    // Colourful flower clusters in the meadow.
     for (let i = 0; i < 60; i++) {
       const spot = this._validSpot(8, 120);
       if (spot && this.terrain.getHeightAt(spot.x, spot.z) < this.terrain.maxHeight * 0.45) {
         this.group.add(makeFlowers(spot.x, spot.z, this.terrain));
       }
     }
-    // A few ruin landmarks.
     for (let i = 0; i < 5; i++) {
       const spot = this._validSpot(30, 160);
       if (spot) this.group.add(makeRuin(spot.x, spot.z, this.terrain));
@@ -144,7 +173,6 @@ export class World {
   }
 
   _buildDungeonEntrance() {
-    // Place the entrance at a fixed, reachable spot on dry land.
     let x = 48, z = -34;
     if (this.terrain.isUnderwater(x, z)) { x = 30; z = 30; }
     this.entrancePos = new THREE.Vector3(x, this.terrain.getHeightAt(x, z), z);
@@ -154,19 +182,35 @@ export class World {
     this.interactables.push({
       position: this.entrancePos,
       range: 4.5,
-      getPrompt: () => '[E] Enter the dungeon',
+      getPrompt: () => '[E] Enter the Sunken Vault',
       interact: (game) => game.enterDungeon(),
     });
   }
 
   _spawnEnemies() {
-    for (let i = 0; i < 14; i++) {
-      const spot = this._validSpot(22, 170);
+    for (let i = 0; i < 12; i++) {
+      const spot = this._validSpot(30, 170);
       if (!spot) continue;
       const kind = Math.random() < 0.65 ? 'chu' : 'moblin';
       const e = new Enemy(kind, spot.x, spot.z, this.terrain);
       this.enemies.push(e);
       this.group.add(e.mesh);
+    }
+  }
+
+  _spawnCamps() {
+    // Moblin camps around fires — little combat set-pieces to stumble into.
+    const spots = [[62, 42], [-72, -48], [-42, 84]];
+    for (const [cx, cz] of spots) {
+      if (this.terrain.isUnderwater(cx, cz)) continue;
+      const fire = makeCampfire(cx, cz, this.terrain, { light: this.quality.lights });
+      this.group.add(fire);
+      this.flickers.push({ flame: fire.userData.flame, light: fire.userData.light, phase: Math.random() * 6 });
+      for (let i = 0; i < 2; i++) {
+        const e = new Enemy('moblin', cx + 2.5 + i * 2, cz + (i ? 2.5 : -2.5), this.terrain);
+        this.enemies.push(e);
+        this.group.add(e.mesh);
+      }
     }
   }
 
@@ -184,9 +228,9 @@ export class World {
     }
 
     const chestDefs = [
-      { dx: -24, dz: 18, reward: { itemId: 'shield', count: 1 } },
-      { dx: 20, dz: 40, reward: { itemId: 'bow', count: 1 } },
-      { dx: -40, dz: -20, reward: { itemId: 'bomb', count: 5 } },
+      { dx: -26, dz: 20, reward: { itemId: 'shield', count: 1 } },
+      { dx: 22, dz: 42, reward: { itemId: 'bow', count: 1 } },
+      { dx: -42, dz: -22, reward: { itemId: 'bomb', count: 5 } },
     ];
     chestDefs.forEach((c, i) => {
       let { dx, dz } = c;
@@ -206,6 +250,17 @@ export class World {
   update(dt, elapsed) {
     const focus = this._followTarget;
 
+    // ---- Day/night cycle drives the sky, fog, and lighting ----
+    this.dayTime = (this.dayTime + dt / DAY_LENGTH) % 1;
+    this.sky.setTime(this.dayTime);
+    this.dayFactor = this.sky.dayFactor;
+    this.fog.color.copy(this.sky.fogColor);
+    this.background.copy(this.sky.fogColor);
+    this.fog.density = 0.0026 + (1 - this.dayFactor) * 0.0016;
+    if (this.fireflies) {
+      this.fireflies.points.material.opacity = 0.12 + (1 - this.dayFactor) * 0.85;
+    }
+
     // Portal shimmer.
     if (this.entrance?.userData.portal) {
       const p = this.entrance.userData.portal;
@@ -213,7 +268,7 @@ export class World {
       p.rotation.z += dt * 0.5;
     }
 
-    // Animated water + grass + clouds + fireflies.
+    // Animated water + grass + clouds + fireflies + villagers + fires.
     if (this.water?.material.userData.shader) {
       this.water.material.userData.shader.uniforms.uTime.value = elapsed;
     }
@@ -224,16 +279,19 @@ export class World {
     this.grass?.update(elapsed);
     this.clouds?.update(dt);
     this.fireflies?.update(elapsed, focus);
+    this.village?.update(dt, elapsed);
+    for (const f of this.flickers) {
+      const k = 1 + Math.sin(elapsed * 12 + f.phase) * 0.2;
+      f.flame.scale.set(k, k, k);
+      if (f.light) f.light.intensity = 3 + Math.sin(elapsed * 14 + f.phase) * 1.1;
+    }
 
-    // Wind sway on tree crowns.
     for (const s of this.swayables) {
       s.crown.rotation.x = Math.sin(elapsed * 1.2 + s.phase) * s.amp;
       s.crown.rotation.z = Math.cos(elapsed * 0.9 + s.phase) * s.amp;
     }
 
-    // Keep the sky dome and sun shadow frustum centered on the viewer.
     if (focus) this.sky.follow(focus);
-
     for (const c of this.chests) c.update(dt);
   }
 

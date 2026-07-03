@@ -1,12 +1,10 @@
 import * as THREE from 'three';
 
-// Resolves sword hits against enemies and enemy contact damage against the
-// player. Operates on the active area's enemy list each frame.
+// Resolves sword hits and enemy contact, returning granular events so the game
+// can layer on feedback: sound, spark particles, hit-stop, and camera shake.
 export const Combat = {
-  // Returns an array of { position, key, rupeeColor } drop descriptors for any
-  // enemies killed this frame so the caller can spawn pickups.
   resolve(player, enemies, dt) {
-    const drops = [];
+    const events = { hits: [], kills: [], playerHit: null, blocked: false };
     const sphere = player.getAttackSphere();
 
     for (const enemy of enemies) {
@@ -18,10 +16,14 @@ export const Combat = {
         if (d < sphere.radius + 0.6) {
           player.hitSet.add(enemy);
           const killed = enemy.takeHit(player.swordDamage, player.position);
+          const hp = enemy.mesh.position.clone();
+          hp.y += 1;
+          events.hits.push({ position: hp });
           if (killed) {
-            drops.push({
+            events.kills.push({
               position: enemy.mesh.position.clone(),
               dropsKey: enemy.dropsKey,
+              isBoss: enemy.isBoss,
               rupeeColor: enemy.kind === 'moblin' ? 'blue' : 'green',
               rupeeValue: enemy.kind === 'moblin' ? 5 : 1,
             });
@@ -29,12 +31,14 @@ export const Combat = {
         }
       }
 
-      // Enemy contact vs player.
+      // Enemy AI + contact vs player.
       const dmg = enemy.update(dt, player.position);
       if (dmg > 0) {
-        player.takeDamage(dmg, enemy.mesh.position);
+        const result = player.takeDamage(dmg, enemy.mesh.position);
+        if (result === 'hit') events.playerHit = enemy.mesh.position.clone();
+        else if (result === 'blocked') events.blocked = true;
       }
     }
-    return drops;
+    return events;
   },
 };

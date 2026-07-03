@@ -12,7 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // bloom makes emissive surfaces glow. Everything runs in an HDR (half-float)
 // buffer so highlights bloom smoothly.
 export function createComposer(renderer, scene, camera, quality = {}) {
-  const { samples = 4, ao = true } = quality;
+  const { samples = 4, ao = true, smaa = true } = quality;
   const size = renderer.getSize(new THREE.Vector2());
   const pr = renderer.getPixelRatio();
 
@@ -45,10 +45,14 @@ export function createComposer(renderer, scene, camera, quality = {}) {
   );
   composer.addPass(bloom);
 
-  const smaa = new SMAAPass(size.x * pr, size.y * pr);
-  composer.addPass(smaa);
+  // SMAA is a real cost on phone GPUs; mobile relies on the lower DPR instead.
+  let smaaPass = null;
+  if (smaa) {
+    smaaPass = new SMAAPass(size.x * pr, size.y * pr);
+    composer.addPass(smaaPass);
+  }
 
   composer.addPass(new OutputPass());
 
-  return { composer, bloom, gtao, smaa };
+  return { composer, bloom, gtao, smaa: smaaPass };
 }

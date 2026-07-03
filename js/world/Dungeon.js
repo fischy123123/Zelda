@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Enemy } from '../entities/Enemy.js?v=13';
-import { Chest } from '../entities/Chest.js?v=13';
-import { Pickup } from '../entities/Pickup.js?v=13';
+import { Enemy } from '../entities/Enemy.js?v=14';
+import { Chest } from '../entities/Chest.js?v=14';
+import { Pickup } from '../entities/Pickup.js?v=14';
 
 // A flat terrain stand-in so the player/enemies/camera clamp to the stone floor.
 const FLAT = {
@@ -146,9 +146,11 @@ export class Dungeon {
       this.enemies.push(e);
       this.group.add(e.mesh);
     }
-    // Treasure-room boss guard.
+    // Treasure-room boss.
     const boss = new Enemy('moblin', 0, 14, this.terrain);
-    boss.maxHp = 10; boss.hp = 10; boss.speed = 3.6; boss.mesh.scale.setScalar(1.6);
+    boss.maxHp = 12; boss.hp = 12; boss.speed = 3.4; boss.mesh.scale.setScalar(1.7);
+    boss.isBoss = true;
+    boss.displayName = 'Gorlok the Vault-Keeper';
     this.enemies.push(boss);
     this.group.add(boss.mesh);
   }

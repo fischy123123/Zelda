@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=13';
+import { stylizeCharacter } from '../gfx/Materials.js?v=14';
 
 // Simple enemy with patrol + chase AI. Two flavors:
 //   'chu'    — a bouncy slime (weak)
@@ -22,6 +22,9 @@ export class Enemy {
     this.damage = stats.damage;
     this.touchRange = stats.touch;
     this.dropsKey = !!opts.dropsKey;
+    this.isBoss = false;
+    this.displayName = null;
+    this.enraged = false;
 
     this.home = new THREE.Vector3(x, 0, z);
     this.wanderTarget = this.home.clone();
@@ -132,6 +135,14 @@ export class Enemy {
       }
     });
     if (this.hp <= 0) { this.dead = true; return true; }
+    // Boss phase two: at half health it enrages — faster and tinted red.
+    if (this.isBoss && !this.enraged && this.hp <= this.maxHp / 2) {
+      this.enraged = true;
+      this.speed *= 1.45;
+      this.mesh.traverse((o) => {
+        if (o.isMesh && o.material.color) o.material.color.lerp(new THREE.Color(0xff3020), 0.4);
+      });
+    }
     return false;
   }
 

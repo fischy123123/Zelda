@@ -311,3 +311,157 @@ kbd {
   background: #0b0f17;
 }
 #loading.hidden { display: none; }
+
+/* ---------- Adventure HUD: objective, stamina, minimap, boss, region ---------- */
+#objective {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(78vw, 560px);
+  background: rgba(10, 16, 24, 0.66);
+  border: 1px solid rgba(111, 227, 196, 0.5);
+  border-radius: 16px;
+  padding: 5px 16px;
+  font-size: 14px;
+  color: #d9fff2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#stamina {
+  position: absolute;
+  top: 56px;
+  left: 22px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  --p: 100;
+  --sc: #6fe06a;
+  background: conic-gradient(var(--sc) calc(var(--p) * 1%), rgba(255, 255, 255, 0.16) 0);
+  -webkit-mask: radial-gradient(circle, transparent 40%, #000 42%);
+  mask: radial-gradient(circle, transparent 40%, #000 42%);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+#stamina.exhausted { --sc: #e05555; animation: st-pulse 0.4s infinite alternate; }
+@keyframes st-pulse { from { opacity: 1; } to { opacity: 0.45; } }
+
+#minimap {
+  position: absolute;
+  top: 54px;
+  right: 22px;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(8, 12, 18, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+@media (max-width: 760px) {
+  #minimap { width: 96px; height: 96px; top: 50px; right: 14px; }
+}
+
+#bossbar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(64vw, 440px);
+  text-align: center;
+}
+#bossname {
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: #ffd9d0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  margin-bottom: 4px;
+}
+#bosstrack {
+  height: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(20, 8, 8, 0.7);
+  overflow: hidden;
+}
+#bossfill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #c22, #f66);
+  transition: width 0.15s ease;
+}
+
+#region-splash {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(26px, 5.5vw, 48px);
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 6px;
+  color: #f4efe0;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#region-splash.show { animation: region 3.4s ease forwards; }
+@keyframes region {
+  0% { opacity: 0; letter-spacing: 10px; }
+  15% { opacity: 1; letter-spacing: 6px; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- Dialogue ---------- */
+#dialogue {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4%);
+  transform: translateX(-50%);
+  width: min(92vw, 640px);
+  z-index: 25;
+  background: rgba(9, 14, 22, 0.92);
+  border: 2px solid rgba(111, 227, 196, 0.6);
+  border-radius: 14px;
+  padding: 12px 18px 16px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+#dlg-name {
+  color: #6fe3c4;
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+#dlg-text { font-size: 17px; line-height: 1.45; min-height: 3.6em; }
+#dlg-hint {
+  position: absolute;
+  right: 14px;
+  bottom: 8px;
+  color: #6fe3c4;
+  animation: dlg-bob 0.8s infinite alternate;
+}
+@keyframes dlg-bob { from { transform: translateY(0); } to { transform: translateY(4px); } }
+
+.mobile-tip { margin-top: 10px; font-size: 13px; opacity: 0.7; }
+
+/* New touch buttons */
+.btn-roll {
+  width: 62px; height: 62px; font-size: 30px;
+  right: calc(env(safe-area-inset-right, 0px) + 212px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+}
+.btn-block {
+  width: 62px; height: 62px; font-size: 26px;
+  right: calc(env(safe-area-inset-right, 0px) + 122px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 152px);
+  border-color: #7ab8ff;
+}
+.btn-lock {
+  width: 54px; height: 54px; font-size: 24px;
+  right: calc(env(safe-area-inset-right, 0px) + 216px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 172px);
+  border-color: #ffd23f;
+}

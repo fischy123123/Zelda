@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rockTexture, barkTexture } from '../gfx/Textures.js?v=13';
+import { rockTexture, barkTexture } from '../gfx/Textures.js?v=14';
 
 // Factory functions that build low-poly props from primitives. Each returns a
 // THREE.Group already positioned on the ground via terrain.getHeightAt.
@@ -143,6 +143,42 @@ export function makeDungeonEntrance(x, z, terrain) {
   light.position.y = 2.2;
   g.add(light);
 
+  g.position.set(x, terrain.getHeightAt(x, z), z);
+  return g;
+}
+
+// A moblin camp fire: stone ring, crossed logs, and a flickering flame.
+export function makeCampfire(x, z, terrain, { light = true } = {}) {
+  const g = new THREE.Group();
+  const stone = new THREE.MeshStandardMaterial({ color: 0x7d7f86, roughness: 1, flatShading: true });
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 0), stone);
+    rock.position.set(Math.cos(a) * 0.7, 0.12, Math.sin(a) * 0.7);
+    rock.castShadow = true;
+    g.add(rock);
+  }
+  const wood = new THREE.MeshStandardMaterial({ color: 0x5b3a22, roughness: 1 });
+  for (const r of [0.5, -0.5]) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.0, 6), wood);
+    log.rotation.z = Math.PI / 2;
+    log.rotation.y = r;
+    log.position.y = 0.15;
+    g.add(log);
+  }
+  const flame = new THREE.Mesh(
+    new THREE.ConeGeometry(0.3, 0.9, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffb347 })
+  );
+  flame.position.y = 0.6;
+  g.add(flame);
+  g.userData.flame = flame;
+  if (light) {
+    const pl = new THREE.PointLight(0xff9a3d, 3.5, 14, 1.6);
+    pl.position.y = 1.0;
+    g.add(pl);
+    g.userData.light = pl;
+  }
   g.position.set(x, terrain.getHeightAt(x, z), z);
   return g;
 }

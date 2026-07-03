@@ -30,16 +30,19 @@ declared in the import map in `index.html`.
 
 ## 🎮 Controls
 
-| Action            | Keys                          |
-| ----------------- | ----------------------------- |
-| Move              | `W` `A` `S` `D` / Arrow keys  |
-| Look / orbit cam  | Move the mouse (click to lock)|
-| Run               | `Shift`                       |
-| Jump              | `Space`                       |
-| Swing sword       | Left-click or `F`             |
-| Interact          | `E` (chests, doors, portals)  |
-| Inventory         | `I`                           |
-| Pause             | `Esc`                         |
+| Action            | Desktop                        | Phone                     |
+| ----------------- | ------------------------------ | ------------------------- |
+| Move              | `W` `A` `S` `D` / Arrows       | Left analog stick         |
+| Look / orbit cam  | Mouse (click to lock)          | Drag right side of screen |
+| Run (stamina)     | `Shift`                        | `»` (hold)                |
+| Jump              | `Space`                        | `↥`                       |
+| Swing sword       | Left-click or `F`              | `⚔`                       |
+| Dodge roll        | `C` / `Ctrl`                   | `⟳`                       |
+| Block (shield)    | Hold `Q` / Right-click         | Hold `🛡`                 |
+| Lock-on (Z-target)| `Tab`                          | `🎯`                      |
+| Interact / talk   | `E`                            | `E`                       |
+| Inventory         | `I`                            | `🎒`                      |
+| Pause             | `Esc`                          | `Ⅱ`                       |
 
 ## 📱 Playing on a phone
 
@@ -51,8 +54,35 @@ GitHub Pages link on your phone:
 - **⚔ button** — swing the Master Sword &nbsp; **↥** — jump &nbsp; **E** — interact
 - **»** — hold to run &nbsp; **🎒** — inventory &nbsp; **Ⅱ** — pause
 - Graphics quality scales down automatically on mobile for a smooth frame rate.
+- The game detects phones and scales itself: lower render resolution, lighter
+  shadows/effects, fewer grass blades, and an auto-follow camera that drifts in
+  behind you as you move, so one thumb can steer.
 
 Tip: add the page to your home screen for a full-screen, app-like experience.
+
+## ⚔️ The Adventure Update
+
+A full rework that makes it play like a real Zelda game:
+
+- **Quest line & NPCs** — talk to **Elder Maru** in Hylia Village to begin the
+  hunt for the **Shard of Power**; a HUD objective tracks every step, and a
+  typewriter dialogue box drives conversations.
+- **Hylia Village** — houses (with collision), a well, torch posts, and two
+  villagers with stage-aware dialogue.
+- **Zelda combat** — `Tab` **Z-target lock-on** (camera + strafing + reticle),
+  **dodge roll** with i-frames, **shield blocking** that negates frontal hits,
+  and a **stamina wheel** that limits sprinting.
+- **Combat feel** — hit-stop freeze frames, camera shake, and spark particles
+  on every connect; a boss health bar for **Gorlok the Vault-Keeper**, who
+  enrages at half health.
+- **Day/night cycle** — an 8-minute day: dusk glow, stars, a moon, moonlit
+  shadows, night fireflies, and music that shifts after dark.
+- **Procedural music & SFX** — a WebAudio synth plays a wandering melody with
+  day/night/dungeon moods, plus synthesized effects for swings, hits, blocks,
+  rupees, chests, fanfares, and more. No audio files.
+- **Minimap & regions** — a circular overworld minimap with markers, and
+  BOTW-style region name splashes (Hylia Village, Verdant Meadow, …).
+- **Moblin camps** — firelit camps to raid out in the wilds.
 
 ## ✨ Features
 

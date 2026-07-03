@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0b0f17" />
   <title>Legend of the Verdant Realm — a 3D open-world adventure</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=14" />
   <!-- No build tool: resolve bare module specifiers via an import map to a CDN -->
   <script type="importmap">
   {
@@ -24,12 +24,27 @@
   <!-- HUD overlay -->
   <div id="hud" class="hidden">
     <div id="hearts" class="hud-row"></div>
+    <div id="stamina" class="hidden"></div>
     <div id="wallet" class="hud-row">
       <span class="rupee-icon"></span><span id="rupee-count">0</span>
       <span class="key-icon"></span><span id="key-count">0</span>
     </div>
+    <canvas id="minimap" width="150" height="150" class="hidden"></canvas>
+    <div id="objective" class="hidden"></div>
+    <div id="bossbar" class="hidden">
+      <div id="bossname"></div>
+      <div id="bosstrack"><div id="bossfill"></div></div>
+    </div>
+    <div id="region-splash" class="hidden"></div>
     <div id="prompt" class="hidden"></div>
     <div id="toast"></div>
+  </div>
+
+  <!-- Dialogue box -->
+  <div id="dialogue" class="hidden">
+    <div id="dlg-name"></div>
+    <div id="dlg-text"></div>
+    <div id="dlg-hint">▼</div>
   </div>
 
   <!-- Inventory overlay -->
@@ -54,14 +69,17 @@
         <li><kbd>Mouse</kbd> Look / orbit camera</li>
         <li><kbd>Shift</kbd> Run &nbsp; <kbd>Space</kbd> Jump</li>
         <li><kbd>Click</kbd> / <kbd>F</kbd> Swing sword</li>
-        <li><kbd>E</kbd> Interact (chests, doors)</li>
+        <li><kbd>Tab</kbd> Lock-on &nbsp; <kbd>C</kbd> Dodge roll</li>
+        <li><kbd>Q</kbd> / <kbd>RMB</kbd> Hold to block (needs shield)</li>
+        <li><kbd>E</kbd> Interact (chests, people, doors)</li>
         <li><kbd>I</kbd> Inventory &nbsp; <kbd>Esc</kbd> Pause</li>
       </ul>
+      <p class="mobile-tip">📱 On phones: use the on-screen stick &amp; buttons — landscape is best.</p>
     </div>
   </div>
 
   <div id="loading">Loading the realm…</div>
 
-  <script type="module" src="js/main.js?v=13"></script>
+  <script type="module" src="js/main.js?v=14"></script>
 </body>
 </html>
