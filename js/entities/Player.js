@@ -104,10 +104,12 @@ export class Player {
     const wantMove = Math.hypot(ix, iz) > 0.01;
     let targetYaw = this.yaw;
     if (wantMove) {
-      // Camera-relative move direction.
+      // Camera-relative move direction. The camera sits at
+      // player + (sin(camYaw), cos(camYaw))·d, so its forward (into the
+      // screen) is (-sin, -cos) and screen-right is (cos, -sin).
       _move.set(ix, 0, iz).normalize();
       const sin = Math.sin(camYaw), cos = Math.cos(camYaw);
-      _fwd.set(_move.x * cos - _move.z * sin, 0, _move.x * sin + _move.z * cos).multiplyScalar(-1);
+      _fwd.set(_move.x * cos + _move.z * sin, 0, -_move.x * sin + _move.z * cos);
       targetYaw = Math.atan2(_fwd.x, _fwd.z);
     }
 
