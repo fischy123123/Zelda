@@ -62,6 +62,27 @@ if (doPlay && ready === 'ready') {
     pos: window.game.player.position.toArray().map((v) => +v.toFixed(1)),
   }));
   console.log('stats:', JSON.stringify(stats));
+
+  // Location tour.
+  const tp = async (name, x, z, tod, yaw = 0.5) => {
+    await page.evaluate(([x, z, tod, yaw]) => {
+      const g = window.game;
+      g.sky.setTimeOfDay(tod);
+      g.player.respawn(x, z, yaw);
+      g.cameraRig.snapBehind(g.player, yaw + Math.PI * 0.9);
+    }, [x, z, tod, yaw]);
+    await page.waitForTimeout(3500);
+    await page.screenshot({ path: `${outDir}/${name}.png` });
+  };
+  await tp('10-village', 60, 10, 0.45, Math.PI);
+  await tp('11-lake', -260, 140, 0.55, -1.2);
+  await tp('12-forest', -60, -380, 0.4, Math.PI);
+  await tp('13-shrine', -150, -480, 0.5, Math.PI);
+  await tp('14-camp', 275, -150, 0.5, 0.4);
+  // Dungeon interior.
+  await page.evaluate(() => window.game.dungeon.enter());
+  await page.waitForTimeout(4000);
+  await page.screenshot({ path: `${outDir}/15-dungeon.png` });
 }
 
 console.log('--- console log (errors/warnings) ---');

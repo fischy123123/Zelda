@@ -366,10 +366,12 @@ export class Dungeon {
       : [[0, -10, 5, 1.6], [0, -50, 5.5, 1.5], [0, -84, 5, 1.3],
          [-10, -122, 7, 1.9], [10, -134, 7, 1.9], [0, -153, 6.5, 1.4]];
     for (const [lx, lz, ly, base] of lights) {
-      const pt = new THREE.PointLight(0xffa54e, base, 30, 1.6);
+      // r160 physical light units: point lights need candela-scale intensity.
+      const scaled = base * 30;
+      const pt = new THREE.PointLight(0xffa54e, scaled, 34, 1.4);
       pt.position.set(lx, ly, lz);
       inner.add(pt);
-      this._lights.push({ light: pt, base, phase: this.rng.range(0, TAU) });
+      this._lights.push({ light: pt, base: scaled, phase: this.rng.range(0, TAU) });
     }
     this._brazierLight = this._lights[1];
 

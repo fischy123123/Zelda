@@ -67,7 +67,8 @@ const COMPOSITE_FRAG = /* glsl */`
 
     // Color grade: gentle S-curve, warm highlights, teal shadows, +sat.
     col = clamp(col, 0.0, 1.0);
-    col = col * col * (3.0 - 2.0 * col) * 0.55 + col * 0.45;
+    col = col * col * (3.0 - 2.0 * col) * 0.28 + col * 0.72;
+    col = min(col * 1.04 + 0.012, 1.0);   // gentle lift so shadows stay readable
     float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
     col += (vec3(1.0, 0.95, 0.82) - 1.0) * lum * lum * 0.28;         // warm highs
     col += (vec3(0.86, 0.98, 1.02) - 1.0) * (1.0 - lum) * 0.10;      // cool lows
@@ -79,7 +80,7 @@ const COMPOSITE_FRAG = /* glsl */`
     col += vec3(1.0, 0.85, 0.45) * uFlashGold * 0.25 * (1.0 - edge);
 
     // Vignette + film grain.
-    col *= 1.0 - smoothstep(0.55, 0.95, edge) * 0.32;
+    col *= 1.0 - smoothstep(0.58, 0.98, edge) * 0.22;
     col += (hash(vUv * vec2(1920.0, 1080.0) + fract(uTime) * 43.0) - 0.5) * 0.015;
 
     gl_FragColor = vec4(col, 1.0);

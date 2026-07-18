@@ -13,18 +13,18 @@ const _sunWorld = new THREE.Vector3();
 // t: 0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset.
 const KEYS = [
   //  t     zenith    horizon   sunCol   sunI  hemiSky  hemiGnd  hemiI  fogCol   fogNear fogFar
-  { t: 0.00, ze: 0x070a1c, ho: 0x101830, su: 0x8ea6d4, si: 0.14, hs: 0x1a2340, hg: 0x0c0f18, hi: 0.34, fo: 0x0d1326, fn: 60, ff: 520 },
-  { t: 0.21, ze: 0x0a0f24, ho: 0x1c2340, su: 0x9db0d8, si: 0.12, hs: 0x202a4a, hg: 0x10131c, hi: 0.36, fo: 0x131a30, fn: 60, ff: 560 },
-  { t: 0.25, ze: 0x35507e, ho: 0xffab66, su: 0xffb066, si: 0.85, hs: 0x6a7ba0, hg: 0x574a3c, hi: 0.5, fo: 0xe8b48c, fn: 70, ff: 700 },
-  { t: 0.30, ze: 0x4a7cc0, ho: 0xffd9a0, su: 0xffd9a8, si: 1.1, hs: 0x8fa8cc, hg: 0x6b6a52, hi: 0.55, fo: 0xead8b8, fn: 90, ff: 850 },
-  { t: 0.40, ze: 0x4f8fdc, ho: 0xcfe6f4, su: 0xfff2d0, si: 1.28, hs: 0xa8c4e0, hg: 0x77805c, hi: 0.6, fo: 0xd6e6ee, fn: 110, ff: 1000 },
-  { t: 0.50, ze: 0x4487dd, ho: 0xc2e0f2, su: 0xfff6dc, si: 1.35, hs: 0xaccae4, hg: 0x7a8560, hi: 0.62, fo: 0xd2e4ee, fn: 120, ff: 1050 },
-  { t: 0.60, ze: 0x4a86cf, ho: 0xc8ddec, su: 0xffedc2, si: 1.25, hs: 0xa4bedc, hg: 0x788058, hi: 0.6, fo: 0xd4e0e8, fn: 110, ff: 980 },
-  { t: 0.70, ze: 0x3d5f9e, ho: 0xffc07a, su: 0xffc784, si: 1.0, hs: 0x8892b8, hg: 0x6a5f48, hi: 0.55, fo: 0xecc79a, fn: 90, ff: 820 },
-  { t: 0.75, ze: 0x2c3a6a, ho: 0xff8f56, su: 0xff9558, si: 0.7, hs: 0x5d628e, hg: 0x4c4136, hi: 0.48, fo: 0xdd9a74, fn: 75, ff: 700 },
-  { t: 0.80, ze: 0x121a3a, ho: 0x54406e, su: 0xc9a0b4, si: 0.24, hs: 0x2c3358, hg: 0x1c1a22, hi: 0.4, fo: 0x2c2c4c, fn: 65, ff: 580 },
-  { t: 0.85, ze: 0x080c20, ho: 0x141c38, su: 0x93a8d2, si: 0.15, hs: 0x1c2544, hg: 0x0e111a, hi: 0.35, fo: 0x101728, fn: 60, ff: 530 },
-  { t: 1.00, ze: 0x070a1c, ho: 0x101830, su: 0x8ea6d4, si: 0.14, hs: 0x1a2340, hg: 0x0c0f18, hi: 0.34, fo: 0x0d1326, fn: 60, ff: 520 },
+  { t: 0.00, ze: 0x0d1430, ho: 0x1c2848, su: 0xa8bce4, si: 0.4, hs: 0x38466e, hg: 0x1e2433, hi: 0.62, fo: 0x161e38, fn: 70, ff: 560 },
+  { t: 0.21, ze: 0x101836, ho: 0x2a3452, su: 0xb0c0e0, si: 0.38, hs: 0x404e74, hg: 0x232837, hi: 0.62, fo: 0x1d2540, fn: 70, ff: 600 },
+  { t: 0.25, ze: 0x35507e, ho: 0xffab66, su: 0xffb066, si: 1.0, hs: 0x8a9ac0, hg: 0x6a5c4c, hi: 0.72, fo: 0xe8b48c, fn: 80, ff: 720 },
+  { t: 0.30, ze: 0x4a7cc0, ho: 0xffd9a0, su: 0xffd9a8, si: 1.25, hs: 0xa5bcda, hg: 0x7d7c62, hi: 0.8, fo: 0xead8b8, fn: 100, ff: 880 },
+  { t: 0.40, ze: 0x4f8fdc, ho: 0xcfe6f4, su: 0xfff2d0, si: 1.4, hs: 0xbdd4ec, hg: 0x8a9268, hi: 0.88, fo: 0xd6e6ee, fn: 120, ff: 1020 },
+  { t: 0.50, ze: 0x4487dd, ho: 0xc2e0f2, su: 0xfff6dc, si: 1.45, hs: 0xc2daf0, hg: 0x8c966c, hi: 0.9, fo: 0xd2e4ee, fn: 130, ff: 1080 },
+  { t: 0.60, ze: 0x4a86cf, ho: 0xc8ddec, su: 0xffedc2, si: 1.38, hs: 0xb8d0e8, hg: 0x899066, hi: 0.86, fo: 0xd4e0e8, fn: 120, ff: 1000 },
+  { t: 0.70, ze: 0x3d5f9e, ho: 0xffc07a, su: 0xffc784, si: 1.15, hs: 0x9aa6c8, hg: 0x7a6e56, hi: 0.78, fo: 0xecc79a, fn: 100, ff: 850 },
+  { t: 0.75, ze: 0x2c3a6a, ho: 0xff8f56, su: 0xff9558, si: 0.85, hs: 0x707a9e, hg: 0x5c5044, hi: 0.72, fo: 0xdd9a74, fn: 85, ff: 720 },
+  { t: 0.80, ze: 0x1a2448, ho: 0x5c4878, su: 0xc9a0b4, si: 0.5, hs: 0x4a527a, hg: 0x2e2a30, hi: 0.66, fo: 0x363656, fn: 75, ff: 620 },
+  { t: 0.85, ze: 0x0f1734, ho: 0x222c4c, su: 0xa8bce4, si: 0.42, hs: 0x3c4a72, hg: 0x202532, hi: 0.62, fo: 0x1a2240, fn: 70, ff: 570 },
+  { t: 1.00, ze: 0x0d1430, ho: 0x1c2848, su: 0xa8bce4, si: 0.4, hs: 0x38466e, hg: 0x1e2433, hi: 0.62, fo: 0x161e38, fn: 70, ff: 560 },
 ];
 // Pre-parse hex → Color once.
 for (const k of KEYS) {
@@ -217,11 +217,11 @@ export class Sky {
       this.dome.visible = false;
       this.sunLight.intensity = 0;
       this.sunLight.castShadow = false;
-      this.hemi.color.set(0x3a2e22);
-      this.hemi.groundColor.set(0x14100c);
-      this.hemi.intensity = 0.5;
-      fog.color.set(0x080604);
-      fog.near = 8; fog.far = 90;
+      this.hemi.color.set(0x4a3b2c);
+      this.hemi.groundColor.set(0x1c1610);
+      this.hemi.intensity = 0.85;
+      fog.color.set(0x0a0705);
+      fog.near = 12; fog.far = 120;
     } else {
       this.dome.visible = true;
       this.sunLight.castShadow = true;

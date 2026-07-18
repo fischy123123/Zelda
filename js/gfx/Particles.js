@@ -47,21 +47,27 @@ class Batch {
     this.aPos = new THREE.BufferAttribute(new Float32Array(capacity * 3), 3);
     this.aCol = new THREE.BufferAttribute(new Float32Array(capacity * 3), 3);
     this.aSize = new THREE.BufferAttribute(new Float32Array(capacity), 1);
+    this.aAlpha = new THREE.BufferAttribute(new Float32Array(capacity), 1);
     this.aPos.setUsage(THREE.DynamicDrawUsage);
     this.aCol.setUsage(THREE.DynamicDrawUsage);
     this.aSize.setUsage(THREE.DynamicDrawUsage);
+    this.aAlpha.setUsage(THREE.DynamicDrawUsage);
     this.geo.setAttribute('position', this.aPos);
     this.geo.setAttribute('color', this.aCol);
     this.geo.setAttribute('size', this.aSize);
+    this.geo.setAttribute('alph', this.aAlpha);
     this.geo.setDrawRange(0, 0);
 
     this.mat = new THREE.ShaderMaterial({
       uniforms: { tMap: { value: makeSpriteTexture(!additive) } },
       vertexShader: /* glsl */`
         attribute float size;
+        attribute float alph;
         varying vec3 vColor;
+        varying float vAlpha;
         void main() {
           vColor = color;
+          vAlpha = alph;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_PointSize = size * (280.0 / max(1.0, -mv.z));
           gl_Position = projectionMatrix * mv;
@@ -70,9 +76,10 @@ class Batch {
       fragmentShader: /* glsl */`
         uniform sampler2D tMap;
         varying vec3 vColor;
+        varying float vAlpha;
         void main() {
           vec4 t = texture2D(tMap, gl_PointCoord);
-          gl_FragColor = vec4(vColor * t.rgb, t.a);
+          gl_FragColor = vec4(vColor * t.rgb, t.a * vAlpha);
           if (gl_FragColor.a < 0.01) discard;
         }
       `,
@@ -141,14 +148,16 @@ class Batch {
       this.aPos.array[i * 3 + 2] = this.pz[i];
       let alpha = f < 0.15 ? f / 0.15 : 1 - t((f - 0.15) / 0.85);
       if (this.flick[i] > 0) alpha *= 0.55 + 0.45 * Math.sin(this._time * this.flick[i] + i * 3.1);
-      this.aCol.array[i * 3] = this.cr[i] * alpha;
-      this.aCol.array[i * 3 + 1] = this.cg[i] * alpha;
-      this.aCol.array[i * 3 + 2] = this.cb[i] * alpha;
+      this.aCol.array[i * 3] = this.cr[i];
+      this.aCol.array[i * 3 + 1] = this.cg[i];
+      this.aCol.array[i * 3 + 2] = this.cb[i];
+      this.aAlpha.array[i] = alpha;
       this.aSize.array[i] = this.size0[i] + (this.size1[i] - this.size0[i]) * f;
     }
     this.aPos.needsUpdate = true;
     this.aCol.needsUpdate = true;
     this.aSize.needsUpdate = true;
+    this.aAlpha.needsUpdate = true;
     this.geo.setDrawRange(0, n);
   }
 }

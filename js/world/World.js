@@ -42,12 +42,15 @@ export class World {
     this._nightWisps();
     this._campRespawn();
 
-    // Soft world boundary: keep the player inside the rim.
-    const p = g.player.position;
-    const d = Math.hypot(p.x, p.z);
-    const maxR = WORLD.playRadius + 130;
-    if (d > maxR) {
-      p.x *= maxR / d; p.z *= maxR / d;
+    // Soft world boundary: keep the player inside the rim (overworld only —
+    // the dungeon interior lives far outside it).
+    if (!g.inDungeon) {
+      const p = g.player.position;
+      const d = Math.hypot(p.x, p.z);
+      const maxR = WORLD.playRadius + 130;
+      if (d > maxR) {
+        p.x *= maxR / d; p.z *= maxR / d;
+      }
     }
   }
 
@@ -56,6 +59,7 @@ export class World {
     if (this._regionTimer > 0) return;
     this._regionTimer = 0.8;
     const g = this.game;
+    if (g.inDungeon) return;
     const r = regionAt(g.player.position.x, g.player.position.z);
     if (r !== this._lastRegion) {
       this._lastRegion = r;

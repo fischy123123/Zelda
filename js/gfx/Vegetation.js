@@ -420,7 +420,10 @@ export class Vegetation {
   _siteClearSoft(x, z, margin, feather) {
     let f = 1;
     for (const s of SITE_LIST) {
-      f *= smoothstep(s.r + margin, s.r + margin + feather, distTo(x, z, s));
+      // Grass may creep into the village outskirts — only the built core
+      // (~55% of the site radius) stays clear; other sites keep full clearance.
+      const r = s === SITES.village ? s.r * 0.55 : s.r;
+      f *= smoothstep(r + margin, r + margin + feather, distTo(x, z, s));
       if (f <= 0) return 0;
     }
     return f;

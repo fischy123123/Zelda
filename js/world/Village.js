@@ -300,7 +300,7 @@ export class Village {
     const glass = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.26), glassMat);
     glass.position.set(0.42, 2.35, 0);
     lg.add(glass);
-    const light = new THREE.PointLight(0xffb45c, 0, 14, 2);
+    const light = new THREE.PointLight(0xffb45c, 0, 16, 1.6);
     light.position.set(0.42, 2.3, 0);
     lg.add(light);
     this._lanterns.push({ light, glassMat, phase: Math.random() * 10 });
@@ -411,7 +411,7 @@ export class Village {
     const t = performance.now() * 0.001;
     for (const l of this._lanterns) {
       const flicker = 1 + Math.sin(t * 9 + l.phase) * 0.06 + Math.sin(t * 23 + l.phase * 2) * 0.04;
-      l.light.intensity = this._nightGlow * 1.5 * flicker;
+      l.light.intensity = this._nightGlow * 40 * flicker;
       l.glassMat.emissiveIntensity = this._nightGlow * 1.3 * flicker;
     }
     for (const w of this._windowMats) {
