@@ -685,7 +685,8 @@ export class Dungeon {
       g.inDungeon = true;
       g.sky?.setUnderground?.(true);
       const p = g.player;
-      p.position.set(OX, this.heightAt(OX, OZ + 8), OZ + 8);
+      // Arrive just inside the hall, in the first pool of torchlight.
+      p.position.set(OX, this.heightAt(OX, OZ - 5), OZ - 5);
       p.velocity.set(0, 0, 0);
       p.yaw = Math.PI;             // face north, into the dark
       p.attack = p.roll = null;
