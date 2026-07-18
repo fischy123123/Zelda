@@ -257,6 +257,12 @@ export class Menus {
   _buildInventory() {
     const s = this._screen('inventory', 'inv');
     const p = el('div', 'panel glass wide', s);
+    const x = el('button', 'panel-x', p, '✕');
+    x.type = 'button';
+    x.addEventListener('click', () => {
+      this.ui.sfx('ui_close');
+      this.game.popModal('inventory');
+    });
     el('h2', 'panel-title', p, 'Inventory');
     el('div', 'panel-orn', p, '✦');
 

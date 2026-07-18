@@ -149,6 +149,8 @@ export class Touch {
     v.z = 0;
     v.held.delete('sprint');
     this.stickKnob.style.transform = 'translate(0px, 0px)';
+    this.stickBase.style.left = '';
+    this.stickBase.style.top = '';
     this.stickBase.classList.remove('live');
   }
 
