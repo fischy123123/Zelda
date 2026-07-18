@@ -1,12 +1,13 @@
 {
-  "name": "verdant-realm",
+  "name": "aurelia",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A 3D open-world Zelda-like adventure built with Three.js, no build tool.",
+  "description": "Aurelia — Legend of the Shattered Star. A 3D open-world action-adventure in the browser: no build step, no external assets, everything procedural.",
   "scripts": {
     "start": "python3 -m http.server 8000",
-    "serve": "npx --yes serve -l 8000 .",
-    "check": "node --check js/main.js && node --check js/core/Game.js"
+    "serve": "npx --yes http-server -p 8000 -c-1 .",
+    "check": "node tools/check.mjs",
+    "screenshot": "node tools/screenshot.mjs"
   }
 }

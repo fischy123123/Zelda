@@ -1,658 +1,428 @@
+// The hero's controller: movement physics, stamina, jumping, rolling,
+// sword combos, guarding, swimming, damage/i-frames. Purely mechanical —
+// all visuals live in HeroModel (js/entities/HeroModel.js), which this
+// class drives through a pose object every frame.
+
 import * as THREE from 'three';
-import { stylizeCharacter } from '../gfx/Materials.js?v=14';
-import { CharacterModel } from './CharacterModel.js?v=14';
-import { HeroModel } from './HeroModel.js?v=14';
-import { AnimatedHero } from './AnimatedHero.js?v=14';
+import { clamp, clamp01, damp, dampAngle, lerp } from '../util/math.js';
 
-const GRAVITY = -28;
-const JUMP_SPEED = 11;
-const WALK_SPEED = 6;
-const RUN_SPEED = 11;
+const _fwd = new THREE.Vector3();
+const _move = new THREE.Vector3();
 
-// Preferred hero: the rigged + animated BOTW Link FBX (real limb motion).
-// Fallbacks if it fails: static textured OBJ, then the procedural Link.
-const USE_ANIM_MODEL = true;
-const USE_LINK_MODEL = false;
-const USE_RIGGED_MODEL = false;
+// Tuning — all speeds in units/second; 1 unit ≈ 1 meter.
+const WALK_SPEED = 6.2;
+const SPRINT_SPEED = 9.6;
+const GUARD_SPEED = 2.4;
+const SWIM_SPEED = 3.4;
+const ACCEL = 34;
+const DECEL = 26;
+const TURN_RATE = 13;
+const GRAVITY = -26;
+const JUMP_VEL = 9.2;
+const ROLL_SPEED = 11.5;
+const ROLL_TIME = 0.46;
+const ATTACK_TIME = 0.38;
+const COMBO_WINDOW = 0.62;   // seconds after a swing during which the next chains
+const SPIN_CHARGE_TIME = 0.55;
+const SPIN_TIME = 0.62;
+const HURT_TIME = 0.42;
+const IFRAME_TIME = 0.9;
 
-// The hero. Built from primitives, moves relative to the camera, swings a sword,
-// jumps with gravity, and is clamped to the terrain. Health is tracked in
-// half-hearts (2 units per heart).
+const STAMINA = {
+  sprint: 16,   // per second
+  swim: 9,      // per second
+  jump: 6,
+  roll: 22,
+  spin: 25,
+  guardHit: 14,
+  regen: 30,    // per second (delayed after use)
+  regenDelay: 0.55,
+};
+
 export class Player {
-  constructor(terrain) {
-    this.terrain = terrain;
-    this.maxHealth = 6;   // 3 hearts
-    this.health = 6;
-    this.velocityY = 0;
-    this.grounded = true;
-    this.facing = 0;      // yaw the model faces
+  constructor(game) {
+    this.game = game;
+    this.position = new THREE.Vector3(0, 20, 0);
+    this.velocity = new THREE.Vector3();
+    this.yaw = 0;
+    this.radius = 0.55;
+    this.height = 1.7;
 
-    this.invuln = 0;      // i-frame timer after taking damage
-    this.knockback = new THREE.Vector3();
+    this.grounded = false;
+    this.sprinting = false;
+    this.guarding = false;
+    this.swimming = false;
+    this.alive = true;
+    this.horizontalSpeed = 0;
+    this.groundProvider = game.terrain; // swapped by dungeon
 
-    this.attacking = false;
-    this.attackTimer = 0;
-    this.attackDuration = 0.35;
-    this.hitSet = new Set();   // enemies already hit by the current swing
-
-    this.swordDamage = 1;
-    this.hasShield = false;
-
-    // Zelda-style combat state: stamina, dodge roll, shield block, Z-target.
-    this.maxStamina = 100;
-    this.stamina = 100;
-    this.exhausted = false;
-    this.blocking = false;
-    this.rolling = -1;            // >=0 while mid-roll (elapsed seconds)
-    this.rollDir = new THREE.Vector3();
-    this.justRolled = false;
-    this.lockTarget = null;       // enemy faced while Z-targeted
-    this.isMoving = false;
-
-    this.group = new THREE.Group();
-    this.group.rotation.order = 'YXZ'; // yaw first so the roll flips forward
-    this._build();
-    this.group.position.set(0, terrain.getHeightAt(0, 0), 0);
+    // Timed states (null or {t: seconds elapsed, ...}).
+    this.attack = null;   // {index: 0..2 | 'spin', t, hitSet:Set}
+    this.roll = null;     // {t, dirX, dirZ}
+    this.hurt = null;     // {t}
+    this.charge = 0;      // spin charge accumulator while attack held
+    this._comboTimer = 0; // time left to chain next swing
+    this._nextCombo = 0;
+    this._coyote = 0;
+    this._jumpBuffer = 0;
+    this._staminaDelay = 0;
+    this._iframes = 0;
+    this._airTime = 0;
+    this.idleTime = 0;
+    this._stepAccum = 0;
+    this.model = null;    // HeroModel attached by Game after construction
   }
 
-  _build() {
-    // Palette tuned to Breath of the Wild Link (blue Champion's Tunic).
-    const C = {
-      tunic: 0x3f76c0, tunicDk: 0x2b5286, under: 0xe8e2c8, skin: 0xf2c79a,
-      hair: 0xf0cb55, belt: 0x6e4a28, buckle: 0xe5c23a, pants: 0xcabd95,
-      boot: 0x5b3a22, glove: 0x9c8b66, bracer: 0x7a5230, scarf: 0x2f74d6,
-      scarfTip: 0xe8932a, steel: 0xe6edf3, hiltBlue: 0x2b5fb0, gold: 0xf3c63f,
-      shieldBlue: 0x244fb8, shieldGold: 0xe5c23a, silver: 0xcdd5df, red: 0xc23a2e,
-    };
-    const mat = (color, { r = 0.85, m = 0, flat = true } = {}) =>
-      new THREE.MeshStandardMaterial({ color, roughness: r, metalness: m, flatShading: flat });
-    const cyl = (rt, rb, h, c, o) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), mat(c, o));
-    const box = (w, h, d, c, o) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c, o));
-    const sph = (r, c, o) => new THREE.Mesh(new THREE.SphereGeometry(r, 18, 18), mat(c, o));
-    const cap = (radius, len, c, o) => new THREE.Mesh(new THREE.CapsuleGeometry(radius, len, 6, 16), mat(c, o));
-
-    // ---------- Torso (green tunic) ----------
-    this.body = new THREE.Group();
-    const torso = cap(0.3, 0.5, C.tunic);   // smooth rounded chest
-    torso.position.y = 1.18;
-    torso.scale.z = 0.82;
-    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.44, 0.58, 18, 1, true), mat(C.tunic, { flat: false }));
-    skirt.position.y = 0.92;
-    const collar = cap(0.17, 0.1, C.under);
-    collar.position.y = 1.48;
-    collar.scale.z = 0.82;
-    const belt = cyl(0.37, 0.37, 0.14, C.belt);
-    belt.position.y = 0.95;
-    const buckle = box(0.16, 0.13, 0.07, C.buckle, { m: 0.4, r: 0.4 });
-    buckle.position.set(0, 0.95, 0.36);
-    const pouch = box(0.14, 0.16, 0.1, C.belt);
-    pouch.position.set(0.28, 0.9, 0.16);
-    // Champion's Tunic chest emblem (gold diamond).
-    const emblem = box(0.17, 0.17, 0.04, C.buckle, { m: 0.4, r: 0.4 });
-    emblem.position.set(0, 1.24, 0.28);
-    emblem.rotation.z = Math.PI / 4;
-    this.body.add(torso, skirt, collar, belt, buckle, pouch, emblem);
-    this._buildShield(this.body, C, box, cyl);
-
-    // ---------- Head (bigger, expressive — Wind Waker / Hyrule Warriors feel) ----------
-    this.head = new THREE.Group();
-    this.head.position.y = 1.74;
-    const face = sph(0.3, C.skin);
-    face.scale.set(1, 1.06, 0.96);
-    const hairBack = sph(0.31, C.hair);
-    hairBack.position.set(0, 0.05, -0.05);
-    hairBack.scale.set(1.03, 1.0, 0.92);
-    // Bangs / fringe poking out under the cap.
-    for (let i = -2; i <= 2; i++) {
-      const bang = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 6), mat(C.hair));
-      bang.position.set(i * 0.1, 0.2, 0.25);
-      bang.rotation.x = Math.PI * 0.9;
-      bang.rotation.z = i * 0.12;
-      this.head.add(bang);
-    }
-    // Sideburns framing the face.
-    for (const sx of [-1, 1]) {
-      const sb = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 6), mat(C.hair));
-      sb.position.set(sx * 0.24, -0.06, 0.14);
-      sb.rotation.x = Math.PI;
-      this.head.add(sb);
-    }
-    // Pointed elf ears.
-    for (const sx of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.24, 6), mat(C.skin));
-      ear.position.set(sx * 0.3, 0.05, 0.02);
-      ear.rotation.set(0, 0, sx * -1.05);
-      this.head.add(ear);
-    }
-    // Big, tall anime eyes (the dark cel outline frames them) + blue irises.
-    for (const sx of [-1, 1]) {
-      const white = sph(0.085, 0xffffff, { flat: false });
-      white.position.set(sx * 0.12, 0.0, 0.27);
-      white.scale.set(0.72, 1.5, 0.5);
-      const iris = sph(0.05, 0x2f6fd6, { flat: false });
-      iris.position.set(sx * 0.12, -0.03, 0.32);
-      iris.scale.set(0.9, 1.2, 0.7);
-      const pupil = sph(0.022, 0x101820, { flat: false });
-      pupil.position.set(sx * 0.12, -0.04, 0.35);
-      // Eyebrow.
-      const brow = box(0.11, 0.025, 0.03, C.hair);
-      brow.position.set(sx * 0.12, 0.13, 0.29);
-      brow.rotation.z = sx * 0.12;
-      this.head.add(white, iris, pupil, brow);
-    }
-    const nose = sph(0.028, C.skin, { flat: false });
-    nose.position.set(0, -0.08, 0.3);
-    this.head.add(face, hairBack, nose);
-
-    // ---------- Hair: tousled blonde top + swept-back ponytail (BOTW, no hat) ----------
-    const hairTop = sph(0.31, C.hair);
-    hairTop.position.set(0, 0.13, -0.03);
-    hairTop.scale.set(1.05, 0.82, 1.02);
-    this.head.add(hairTop);
-    // A few spiky tufts on top.
-    for (let i = -1; i <= 1; i++) {
-      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 6), mat(C.hair));
-      tuft.position.set(i * 0.12, 0.32, -0.02);
-      tuft.rotation.set(-0.2, 0, i * 0.2);
-      this.head.add(tuft);
-    }
-    // Hair tie + swept ponytail (stored in capTail so it sways with motion).
-    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.02, 6, 12), mat(C.belt));
-    tie.position.set(0, 0.18, -0.26);
-    tie.rotation.x = Math.PI / 2;
-    this.head.add(tie);
-    this.capTail = [];
-    let prev = new THREE.Group();
-    prev.position.set(0, 0.16, -0.28);
-    this.head.add(prev);
-    let segR = 0.11;
-    for (let i = 0; i < 4; i++) {
-      const seg = new THREE.Group();
-      const segMesh = new THREE.Mesh(new THREE.ConeGeometry(segR, 0.18, 8), mat(C.hair));
-      segMesh.position.y = -0.09;
-      segMesh.rotation.x = Math.PI;
-      seg.add(segMesh);
-      seg.position.set(0, i === 0 ? 0 : -0.14, 0);
-      seg.rotation.x = 0.85; // sweep back and down
-      prev.add(seg);
-      this.capTail.push(seg);
-      prev = seg;
-      segR *= 0.82;
-    }
-
-    // ---------- Legs (rounded, pivot at hips) ----------
-    const makeLeg = () => {
-      const g = new THREE.Group();
-      const thigh = cap(0.14, 0.34, C.pants);
-      thigh.position.y = -0.3;
-      const boot = cap(0.15, 0.12, C.boot);
-      boot.position.y = -0.64;
-      const toe = box(0.2, 0.13, 0.32, C.boot);
-      toe.position.set(0, -0.72, 0.1);
-      g.add(thigh, boot, toe);
-      return g;
-    };
-    this.legL = makeLeg(); this.legL.position.set(-0.16, 0.92, 0);
-    this.legR = makeLeg(); this.legR.position.set(0.16, 0.92, 0);
-
-    // ---------- Arms (rounded, pivot at shoulders) ----------
-    const makeArm = () => {
-      const g = new THREE.Group();
-      const sleeve = cap(0.12, 0.16, C.tunic);
-      sleeve.position.y = -0.18;
-      const fore = cap(0.1, 0.16, C.bracer);
-      fore.position.y = -0.42;
-      const glove = sph(0.12, C.glove);
-      glove.position.y = -0.56;
-      g.add(sleeve, fore, glove);
-      return g;
-    };
-    this.armL = makeArm(); this.armL.position.set(-0.42, 1.42, 0);
-    this.armR = makeArm(); this.armR.position.set(0.42, 1.42, 0);
-
-    // ---------- Master Sword in the right hand ----------
-    this.sword = new THREE.Group();
-    const grip = cyl(0.028, 0.028, 0.16, C.hiltBlue, { flat: false });
-    const pommel = box(0.07, 0.06, 0.07, C.gold, { m: 0.4 });
-    pommel.position.y = -0.1;
-    const guardWing = box(0.32, 0.05, 0.06, C.gold, { m: 0.4 });
-    guardWing.position.y = 0.1;
-    const blade = box(0.085, 0.95, 0.025, C.steel, { m: 0.5, r: 0.25, flat: false });
-    blade.position.y = 0.6;
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.14, 4), mat(C.steel, { m: 0.5, r: 0.25, flat: false }));
-    tip.position.y = 1.08;
-    this.sword.add(grip, pommel, guardWing, blade, tip);
-    this.sword.position.set(0.02, -0.55, 0.05);
-    this.armR.add(this.sword);
-
-    // Procedural model lives under its own root so it can be hidden once the
-    // rigged human model loads.
-    this.procRoot = new THREE.Group();
-    this.procRoot.add(this.body, this.head, this.legL, this.legR, this.armL, this.armR);
-    this.group.add(this.procRoot);
-    this.procRoot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    stylizeCharacter(this.procRoot, { thickness: 0.04 });
-    this.walkPhase = 0;
-    this.animTime = 0;
-
-    // Sword-slash VFX: a bright crescent shown during the swing's active window.
-    // Works for both the rigged and procedural models and blooms via post.
-    this.slash = new THREE.Mesh(
-      new THREE.RingGeometry(0.9, 1.55, 28, 1, Math.PI * 0.12, Math.PI * 0.8),
-      new THREE.MeshBasicMaterial({
-        color: 0xd6f2ff, transparent: true, opacity: 0,
-        side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-        depthWrite: false, toneMapped: false,
-      })
-    );
-    this.slash.position.set(0, 1.1, 1.0);
-    this.slash.visible = false;
-    this.group.add(this.slash);
-
-    // Shield-guard shimmer shown while blocking.
-    this.blockDisc = new THREE.Mesh(
-      new THREE.CircleGeometry(0.6, 20),
-      new THREE.MeshBasicMaterial({
-        color: 0x7ab8ff, transparent: true, opacity: 0.4,
-        side: THREE.DoubleSide, depthWrite: false,
-      })
-    );
-    this.blockDisc.position.set(0, 1.05, 0.78);
-    this.blockDisc.visible = false;
-    this.group.add(this.blockDisc);
-
-    // The procedural Link shows immediately; swap to a higher-fidelity model
-    // once it loads. The textured BOTW Link OBJ is preferred; the rigged human
-    // model is an alternative experiment.
-    this.usingProc = true;
-    this.usingHero = false;
-    this.usingAnim = false;
-    this.model = null;
-    this.heroModel = null;
-    this.animHero = null;
-    if (USE_ANIM_MODEL) {
-      this.animHero = new AnimatedHero((m) => {
-        if (m && m.ready) {
-          this.group.add(m.root);
-          this.procRoot.visible = false;
-          this.usingProc = false;
-          this.usingAnim = true;
-        }
-      });
-    } else if (USE_LINK_MODEL) {
-      this.heroModel = new HeroModel((m) => {
-        if (m && m.ready) {
-          this.group.add(m.root);
-          this.procRoot.visible = false;
-          this.usingProc = false;
-          this.usingHero = true;
-        }
-      });
-    } else if (USE_RIGGED_MODEL) {
-      this.model = new CharacterModel((m) => {
-        if (m && m.ready) {
-          this.group.add(m.root);
-          this.procRoot.visible = false;
-          this.usingProc = false;
-        }
-      });
-    }
+  get invulnerable() {
+    return this._iframes > 0 || (this.roll && this.roll.t > 0.04 && this.roll.t < 0.32);
   }
 
-  // Hylian Shield worn on the back.
-  _buildShield(parent, C, box, cyl) {
-    const mat = (c, o = {}) =>
-      new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.6, metalness: o.m ?? 0.2, flatShading: true });
+  get busy() { return !!(this.attack || this.roll || this.hurt) || !this.alive; }
 
-    // Heater-shield silhouette via an extruded shape.
-    const s = new THREE.Shape();
-    s.moveTo(-0.26, 0.3);
-    s.quadraticCurveTo(-0.3, 0.18, -0.3, 0.0);
-    s.quadraticCurveTo(-0.3, -0.3, 0, -0.44);
-    s.quadraticCurveTo(0.3, -0.3, 0.3, 0.0);
-    s.quadraticCurveTo(0.3, 0.18, 0.26, 0.3);
-    s.quadraticCurveTo(0, 0.4, -0.26, 0.3);
-    const geo = new THREE.ExtrudeGeometry(s, { depth: 0.06, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, bevelSegments: 1 });
-    geo.center();
-
-    const shield = new THREE.Group();
-    const border = new THREE.Mesh(geo, mat(C.shieldGold, { m: 0.4 }));
-    border.scale.set(1.0, 1.0, 1.0);
-    const face = new THREE.Mesh(geo, mat(C.shieldBlue));
-    face.scale.set(0.86, 0.86, 1.0);
-    face.position.z = 0.02;
-    shield.add(border, face);
-
-    // Silver lower chevron + a small gold Triforce up top.
-    const chevron = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.16, 3), mat(C.silver, { m: 0.5 }));
-    chevron.position.set(0, -0.08, 0.05);
-    chevron.rotation.z = Math.PI;
-    shield.add(chevron);
-    const tri = box(0.07, 0.06, 0.03, C.shieldGold, { m: 0.5 });
-    tri.position.set(0, 0.16, 0.05);
-    shield.add(tri);
-
-    shield.position.set(0, 1.12, -0.3);
-    shield.rotation.set(0.12, Math.PI, 0); // face outward from the back
-    parent.add(shield);
+  spendStamina(amount) {
+    const s = this.game.state;
+    s.stamina = Math.max(0, s.stamina - amount);
+    this._staminaDelay = STAMINA.regenDelay;
   }
 
-  // Long blue scarf draped from the shoulder down the back.
-  _buildScarf(parent, C, box) {
-    this.scarf = new THREE.Group();
-    this.scarf.position.set(0.16, 1.46, -0.16);
-    this.scarfSegs = [];
-    let prev = this.scarf;
-    let w = 0.22;
-    for (let i = 0; i < 5; i++) {
-      const seg = new THREE.Group();
-      const cloth = box(w, 0.26, 0.04, i === 4 ? C.scarfTip : C.scarf);
-      cloth.position.y = -0.13;
-      seg.add(cloth);
-      seg.position.y = i === 0 ? 0 : -0.24;
-      seg.rotation.x = -0.5 - i * 0.12;
-      prev.add(seg);
-      this.scarfSegs.push(seg);
-      prev = seg;
-      w *= 0.92;
-    }
-    parent.add(this.scarf);
-  }
+  // -------------------------------------------------------------------------
+  update(dt) {
+    const g = this.game;
+    const input = g.input;
+    const s = g.state;
+    const ground = this.groundProvider;
 
-  get position() { return this.group.position; }
+    const groundY = ground.heightAt(this.position.x, this.position.z);
+    const waterY = ground.waterLevel ?? -Infinity;
+    const inWaterDepth = waterY - groundY;
+    this.swimming = this.alive && inWaterDepth > 1.15 && this.position.y < waterY + 0.4;
 
-  startAttack() {
-    if (this.attacking) return;
-    this.attacking = true;
-    this.attackTimer = 0;
-    this.hitSet.clear();
-  }
-
-  // While the swing is in its active window, return a sphere in front of the
-  // hero for hit detection; otherwise null.
-  getAttackSphere() {
-    if (!this.attacking) return null;
-    const t = this.attackTimer / this.attackDuration;
-    if (t < 0.15 || t > 0.7) return null; // only the mid part of the swing connects
-    const reach = 1.5;
-    const center = this.group.position.clone();
-    center.x += Math.sin(this.facing) * reach;
-    center.z += Math.cos(this.facing) * reach;
-    center.y += 1.0;
-    return { center, radius: 1.3 };
-  }
-
-  // Returns 'immune' | 'blocked' | 'hit' so the caller can react (sfx, shake).
-  takeDamage(amount, fromPos) {
-    if (this.invuln > 0) return 'immune';
-    // An actively raised shield absorbs frontal blows entirely.
-    if (this.blocking && fromPos) {
-      const toAttacker = new THREE.Vector3().subVectors(fromPos, this.group.position);
-      toAttacker.y = 0;
-      toAttacker.normalize();
-      const facingDir = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
-      if (facingDir.dot(toAttacker) > 0.25) {
-        this.invuln = 0.35;
-        this.knockback.copy(facingDir).multiplyScalar(-3.2); // slide back a step
-        return 'blocked';
-      }
-    }
-    let dmg = amount;
-    // A carried (but not raised) shield still halves incoming damage.
-    if (this.hasShield) dmg = Math.max(1, Math.floor(dmg / 2));
-    this.health = Math.max(0, this.health - dmg);
-    this.invuln = 1.0;
-    if (fromPos) {
-      const kb = new THREE.Vector3().subVectors(this.group.position, fromPos);
-      kb.y = 0;
-      kb.normalize().multiplyScalar(7);
-      this.knockback.copy(kb);
-    }
-    return 'hit';
-  }
-
-  heal(amount) {
-    this.health = Math.min(this.maxHealth, this.health + amount);
-  }
-
-  update(dt, input, camera) {
-    // ---- Movement relative to the camera yaw ----
-    const yaw = camera.yaw;
-    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-
-    const move = new THREE.Vector3();
-    if (input.isDown('KeyW') || input.isDown('ArrowUp')) move.add(forward);
-    if (input.isDown('KeyS') || input.isDown('ArrowDown')) move.sub(forward);
-    if (input.isDown('KeyD') || input.isDown('ArrowRight')) move.add(right);
-    if (input.isDown('KeyA') || input.isDown('ArrowLeft')) move.sub(right);
-
-    // Touch joystick (analog): magnitude scales speed for a natural feel.
-    const tm = input.touchMove;
-    if (tm && (tm.x !== 0 || tm.y !== 0)) {
-      move.addScaledVector(forward, tm.y);
-      move.addScaledVector(right, tm.x);
+    // --- intent -------------------------------------------------------------
+    const camYaw = g.cameraRig.getYaw();
+    let ix = 0, iz = 0;
+    if (this.alive && !g.uiBlocked) { ix = input.move.x; iz = input.move.z; }
+    const wantMove = Math.hypot(ix, iz) > 0.01;
+    let targetYaw = this.yaw;
+    if (wantMove) {
+      // Camera-relative move direction.
+      _move.set(ix, 0, iz).normalize();
+      const sin = Math.sin(camYaw), cos = Math.cos(camYaw);
+      _fwd.set(_move.x * cos - _move.z * sin, 0, _move.x * sin + _move.z * cos).multiplyScalar(-1);
+      targetYaw = Math.atan2(_fwd.x, _fwd.z);
     }
 
-    // ---- Blocking, stamina-limited sprint ----
-    this.blocking = !!(this.hasShield && input.blockHeld && this.grounded
-      && !this.attacking && this.rolling < 0);
-    let running = (input.isDown('ShiftLeft') || input.isDown('ShiftRight'))
-      && !this.exhausted && !this.blocking;
-    const pos = this.group.position;
+    // --- state machines -------------------------------------------------------
+    this._updateTimers(dt);
 
-    let moving = false;
-    const mag = Math.min(1, move.length());
-    if (mag > 0.05 && this.rolling < 0) {
-      move.normalize();
-      let speed = (running ? RUN_SPEED : WALK_SPEED) * mag;
-      if (this.blocking) speed *= 0.45;
-      pos.x += move.x * speed * dt;
-      pos.z += move.z * speed * dt;
-      if (!this.lockTarget) this.facing = Math.atan2(move.x, move.z);
-      moving = true;
-    }
-    this.isMoving = moving;
-
-    // Sprinting drains stamina; resting refills it. Empty = forced walk.
-    if (running && moving && this.grounded) {
-      this.stamina -= 16 * dt;
-      if (this.stamina <= 0) { this.stamina = 0; this.exhausted = true; running = false; }
+    if (this.alive && !g.uiBlocked) {
+      this._handleActions(dt, input, wantMove, targetYaw);
     } else {
-      this.stamina = Math.min(this.maxStamina, this.stamina + 22 * dt);
-      if (this.exhausted && this.stamina >= 30) this.exhausted = false;
+      this.guarding = false; this.sprinting = false;
     }
 
-    // ---- Dodge roll: a quick invulnerable burst with a forward flip ----
-    if (this.rolling < 0 && this.grounded && !this.exhausted && this.stamina >= 20
-        && (input.wasPressed('KeyC') || input.wasPressed('ControlLeft'))) {
-      this.rolling = 0;
-      this.stamina -= 20;
-      this.justRolled = true;
-      if (moving) this.rollDir.copy(move);
-      else this.rollDir.set(Math.sin(this.facing), 0, Math.cos(this.facing));
-    }
-    if (this.rolling >= 0) {
-      this.rolling += dt;
-      const p = Math.min(1, this.rolling / 0.38);
-      pos.x += this.rollDir.x * 11 * (1.25 - p) * dt;
-      pos.z += this.rollDir.z * 11 * (1.25 - p) * dt;
-      this.invuln = Math.max(this.invuln, 0.12);
-      this.group.rotation.x = -p * Math.PI * 2;
-      if (this.rolling >= 0.38) { this.rolling = -1; this.group.rotation.x = 0; }
-    }
+    // --- locomotion -----------------------------------------------------------
+    let maxSpeed = 0;
+    if (this.roll) {
+      maxSpeed = ROLL_SPEED * (1 - 0.5 * clamp01(this.roll.t / ROLL_TIME));
+      this.velocity.x = this.roll.dirX * maxSpeed;
+      this.velocity.z = this.roll.dirZ * maxSpeed;
+      this.yaw = Math.atan2(this.roll.dirX, this.roll.dirZ);
+    } else if (this.hurt || !this.alive) {
+      // Knockback decays; no control.
+      this.velocity.x = damp(this.velocity.x, 0, 6, dt);
+      this.velocity.z = damp(this.velocity.z, 0, 6, dt);
+    } else {
+      const attacking = !!this.attack;
+      this.sprinting = this.alive && input.held('sprint') && wantMove && !this.guarding &&
+        !this.swimming && !attacking && s.stamina > 0.5;
+      if (this.swimming) maxSpeed = SWIM_SPEED;
+      else if (this.guarding) maxSpeed = GUARD_SPEED;
+      else if (attacking) maxSpeed = wantMove ? 1.6 : 0;
+      else maxSpeed = this.sprinting ? SPRINT_SPEED : WALK_SPEED;
 
-    // Apply and decay knockback.
-    if (this.knockback.lengthSq() > 0.001) {
-      pos.x += this.knockback.x * dt;
-      pos.z += this.knockback.z * dt;
-      this.knockback.multiplyScalar(Math.max(0, 1 - dt * 6));
-    }
-
-    // Keep the hero inside the world bounds.
-    const lim = this.terrain.size / 2 - 2;
-    pos.x = THREE.MathUtils.clamp(pos.x, -lim, lim);
-    pos.z = THREE.MathUtils.clamp(pos.z, -lim, lim);
-
-    // ---- Jump + gravity ----
-    const groundY = this.terrain.getHeightAt(pos.x, pos.z);
-    if (this.grounded && input.wasPressed('Space')) {
-      this.velocityY = JUMP_SPEED;
-      this.grounded = false;
-    }
-    this.velocityY += GRAVITY * dt;
-    pos.y += this.velocityY * dt;
-    if (pos.y <= groundY) {
-      pos.y = groundY;
-      this.velocityY = 0;
-      this.grounded = true;
-    }
-
-    // Z-target: always square up to the locked enemy (movement strafes).
-    if (this.lockTarget && !this.lockTarget.dead) {
-      const m = this.lockTarget.mesh.position;
-      this.facing = Math.atan2(m.x - pos.x, m.z - pos.z);
-    }
-
-    // Face movement direction smoothly.
-    const targetRot = this.facing;
-    let diff = targetRot - this.group.rotation.y;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    this.group.rotation.y += diff * Math.min(1, dt * 12);
-
-    // ---- Limb animation ----
-    // ---- Rigged model: drive locomotion state with mocap clips ----
-    if (this.model && this.model.ready) {
-      // No jump clip exists, so airborne -> hold idle (legs stop "running") and
-      // sell the jump with squash-and-stretch on the body instead.
-      let state = 'idle';
-      if (this.grounded && moving) state = running ? 'run' : 'walk';
-      this.model.setState(state);
-      this.model.update(dt);
-
-      // Layer a sword swing onto the arm bones (after the mocap pose is applied).
-      if (this.attacking) {
-        const at = THREE.MathUtils.clamp(this.attackTimer / this.attackDuration, 0, 1);
-        this.model.applyAttackPose(at);
-      }
-
-      let sy = 1, sxz = 1;
-      if (!this.grounded) {
-        const stretch = THREE.MathUtils.clamp(this.velocityY * 0.018, -0.14, 0.16);
-        sy = 1 + stretch;
-        sxz = 1 - stretch * 0.5;
-      }
-      this.model.root.scale.set(sxz, sy, sxz);
-    }
-
-    // ---- Animated BOTW Link (FBX): baked idle + procedural walk on the rig ----
-    if (this.usingAnim && this.animHero) {
-      this.animHero.update(dt); // advances the baked clip (base pose)
-      if (moving && this.grounded) {
-        this.walkPhase += dt * (running ? 16 : 10);
-        this.animHero.walk(this.walkPhase, running ? 1.25 : 1);
-      }
-      if (this.attacking) {
-        const at = THREE.MathUtils.clamp(this.attackTimer / this.attackDuration, 0, 1);
-        this.animHero.attack(at);
-      }
-    }
-
-    // ---- Static BOTW Link model: no skeleton, so fake a lively stride with
-    // whole-body bob, forward lean, and a side-to-side rock ----
-    if (this.usingHero && this.heroModel) {
-      const root = this.heroModel.root;
-      const striding = moving && this.grounded;
-      if (striding) this.walkPhase += dt * (running ? 14 : 9);
-      const w = this.walkPhase;
-      root.position.y = striding ? Math.abs(Math.sin(w)) * 0.06 : root.position.y * 0.8;
-      const targetLean = striding ? (running ? 0.18 : 0.1) : 0;
-      let lean = targetLean;
-      if (this.attacking) {
-        const t = THREE.MathUtils.clamp(this.attackTimer / this.attackDuration, 0, 1);
-        lean += Math.sin(t * Math.PI) * 0.45; // forward lunge on a swing
-      }
-      root.rotation.x += (lean - root.rotation.x) * Math.min(1, dt * 8);
-      root.rotation.z = striding ? Math.sin(w) * 0.05 : root.rotation.z * 0.8;
-    }
-
-    // ---- Procedural Link: limb-swing walk cycle + subtle body bob ----
-    if (this.usingProc) {
-      if (moving && this.grounded) {
-        this.walkPhase += dt * (running ? 16 : 10);
-        const swing = Math.sin(this.walkPhase) * 0.6;
-        this.legL.rotation.x = swing;
-        this.legR.rotation.x = -swing;
-        if (!this.attacking) {
-          this.armL.rotation.x = -swing;
-          this.armR.rotation.x = swing;
-        }
-        // Gentle up-down bob in time with the stride.
-        this.procRoot.position.y = Math.abs(Math.sin(this.walkPhase)) * 0.06;
+      if (wantMove) {
+        this.yaw = dampAngle(this.yaw, targetYaw, this.guarding ? 8 : TURN_RATE, dt);
+        const spd = Math.hypot(this.velocity.x, this.velocity.z);
+        const newSpd = Math.min(maxSpeed, spd + ACCEL * dt);
+        this.velocity.x = Math.sin(this.yaw) * newSpd;
+        this.velocity.z = Math.cos(this.yaw) * newSpd;
       } else {
-        this.legL.rotation.x *= 0.8;
-        this.legR.rotation.x *= 0.8;
-        if (!this.attacking) {
-          this.armL.rotation.x *= 0.8;
-          this.armR.rotation.x *= 0.8;
-        }
-        this.procRoot.position.y *= 0.8;
-      }
-    }
-
-    // ---- Sword swing: always advance the timer (combat needs it); only pose
-    // the procedural arm when the procedural model is shown. ----
-    if (this.attacking) {
-      this.attackTimer += dt;
-      const t = this.attackTimer / this.attackDuration;
-
-      // Slash crescent sweeps across and fades — clear feedback for both models.
-      if (this.slash) {
-        const active = t > 0.08 && t < 0.78;
-        this.slash.visible = active;
-        if (active) {
-          const k = (t - 0.08) / 0.7;
-          this.slash.rotation.z = 1.4 - k * 2.8;
-          this.slash.material.opacity = 0.95 * (1 - k);
-          const s = 0.85 + k * 0.6;
-          this.slash.scale.set(s, s, s);
+        const spd = Math.hypot(this.velocity.x, this.velocity.z);
+        const newSpd = Math.max(0, spd - DECEL * dt);
+        if (spd > 1e-4) {
+          this.velocity.x *= newSpd / spd;
+          this.velocity.z *= newSpd / spd;
         }
       }
-
-      if (this.usingProc) {
-        this.armR.rotation.x = -2.2 + t * 3.4;
-        this.armR.rotation.z = -t * 1.2;
-      }
-      if (this.attackTimer >= this.attackDuration) {
-        this.attacking = false;
-        if (this.slash) this.slash.visible = false;
-        if (this.usingProc) this.armR.rotation.set(0, 0, 0);
+      // Lock-on strafing: face the target while moving.
+      const lock = g.cameraRig.lockTarget;
+      if (lock && lock.alive && !attacking && !this.swimming) {
+        const lp = lock.group.position;
+        this.yaw = dampAngle(this.yaw, Math.atan2(lp.x - this.position.x, lp.z - this.position.z), 10, dt);
       }
     }
 
-    // ---- Cloth sway: scarf + cap tail drift with motion and a gentle breeze ----
-    this.animTime += dt;
-    if (this.usingProc) {
-    const gait = moving ? (running ? 1.6 : 1.0) : 0.4;
-    const flow = Math.sin(this.animTime * 6) * 0.08 * gait + Math.sin(this.animTime * 2.1) * 0.05;
-    if (this.scarfSegs) {
-      for (let i = 0; i < this.scarfSegs.length; i++) {
-        this.scarfSegs[i].rotation.z = flow * (i + 1) * 0.5;
-        this.scarfSegs[i].rotation.y = Math.sin(this.animTime * 3 + i) * 0.06 * (i + 1);
-      }
+    // Stamina drain / regen.
+    if (this.sprinting) this.spendStamina(STAMINA.sprint * dt);
+    if (this.swimming) {
+      this.spendStamina(STAMINA.swim * dt);
+      if (s.stamina <= 0) this._drown();
     }
-    if (this.capTail) {
-      for (let i = 0; i < this.capTail.length; i++) {
-        this.capTail[i].rotation.z = flow * (i + 1) * 0.4;
-      }
-    }
+    if (this._staminaDelay <= 0 && !this.sprinting && !this.swimming) {
+      s.stamina = Math.min(s.maxStamina, s.stamina + STAMINA.regen * dt);
     }
 
-    // ---- Timers / state visuals ----
-    this.invuln = Math.max(0, this.invuln - dt);
-    if (this.blockDisc) this.blockDisc.visible = this.blocking;
-    // Blink while invulnerable (but not during the roll's brief i-frames).
-    this.group.visible = !(this.invuln > 0.2 && Math.floor(this.invuln * 12) % 2 === 0);
+    // --- vertical -------------------------------------------------------------
+    if (this.swimming) {
+      // Bob at the surface.
+      this.velocity.y = 0;
+      this.position.y = damp(this.position.y, waterY - 0.55, 10, dt);
+      this.grounded = false;
+    } else {
+      this.velocity.y += GRAVITY * dt;
+      this.position.y += this.velocity.y * dt;
+      if (this.position.y <= groundY) {
+        if (this._airTime > 0.35 && this.velocity.y < -14) {
+          g.events.emit('player:land', { hard: true });
+          g.cameraRig.shake(0.18);
+        }
+        this.position.y = groundY;
+        this.velocity.y = 0;
+        if (!this.grounded) g.events.emit('player:land', { hard: false });
+        this.grounded = true;
+        this._coyote = 0.12;
+        this._airTime = 0;
+      } else if (this.position.y > groundY + 0.05) {
+        this.grounded = false;
+        this._airTime += dt;
+      }
+    }
+
+    // --- horizontal + collision ----------------------------------------------
+    let nx = this.position.x + this.velocity.x * dt;
+    let nz = this.position.z + this.velocity.z * dt;
+
+    // Steep-slope check: refuse moves that climb walls.
+    const newGround = ground.heightAt(nx, nz);
+    const rise = newGround - groundY;
+    const runLen = Math.hypot(nx - this.position.x, nz - this.position.z);
+    if (this.grounded && runLen > 1e-5 && rise / runLen > 1.7) {
+      // Try sliding along each axis.
+      const gx = ground.heightAt(nx, this.position.z);
+      const gz = ground.heightAt(this.position.x, nz);
+      if ((gx - groundY) / Math.max(Math.abs(nx - this.position.x), 1e-5) <= 1.7) nz = this.position.z;
+      else if ((gz - groundY) / Math.max(Math.abs(nz - this.position.z), 1e-5) <= 1.7) nx = this.position.x;
+      else { nx = this.position.x; nz = this.position.z; }
+    }
+
+    const solved = g.colliders.resolve(nx, nz, this.radius, this.position.y);
+    this.position.x = solved.x;
+    this.position.z = solved.z;
+
+    if (this.grounded && !this.swimming) {
+      this.position.y = ground.heightAt(this.position.x, this.position.z);
+    }
+
+    this.horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+    this.idleTime = (this.horizontalSpeed < 0.2 && !this.busy) ? this.idleTime + dt : 0;
+
+    // Footstep events for audio/particles.
+    if (this.grounded && this.horizontalSpeed > 1) {
+      this._stepAccum += this.horizontalSpeed * dt;
+      const stride = this.sprinting ? 3.1 : 2.4;
+      if (this._stepAccum > stride) {
+        this._stepAccum = 0;
+        g.events.emit('player:step', {
+          pos: this.position,
+          biome: ground.biomeAt ? ground.biomeAt(this.position.x, this.position.z).id : 'stone',
+          sprint: this.sprinting,
+        });
+      }
+    }
+
+    // --- drive the visual model ----------------------------------------------
+    if (this.model) {
+      const grp = this.model.group;
+      grp.position.copy(this.position);
+      grp.rotation.y = this.yaw;
+      this.model.update(dt, {
+        speed: this.horizontalSpeed,
+        runBlend: clamp01(this.horizontalSpeed / WALK_SPEED),
+        sprinting: this.sprinting,
+        grounded: this.grounded,
+        yVel: this.velocity.y,
+        guarding: this.guarding,
+        swimming: this.swimming,
+        attack: this.attack ? { index: this.attack.index, t: this.attack.t / (this.attack.index === 'spin' ? SPIN_TIME : ATTACK_TIME) } : null,
+        roll: this.roll ? { t: this.roll.t / ROLL_TIME } : null,
+        hurt: this.hurt ? { t: this.hurt.t / HURT_TIME } : null,
+        dead: !this.alive,
+        charge: clamp01(this.charge / SPIN_CHARGE_TIME),
+        idleTime: this.idleTime,
+        iframes: this._iframes > 0,
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  _updateTimers(dt) {
+    if (this.attack) {
+      this.attack.t += dt;
+      const dur = this.attack.index === 'spin' ? SPIN_TIME : ATTACK_TIME;
+      if (this.attack.t >= dur) {
+        this._comboTimer = this.attack.index === 'spin' ? 0 : COMBO_WINDOW;
+        this.attack = null;
+      }
+    }
+    if (this.roll) {
+      this.roll.t += dt;
+      if (this.roll.t >= ROLL_TIME) this.roll = null;
+    }
+    if (this.hurt) {
+      this.hurt.t += dt;
+      if (this.hurt.t >= HURT_TIME) this.hurt = null;
+    }
+    this._comboTimer = Math.max(0, this._comboTimer - dt);
+    this._coyote = Math.max(0, this._coyote - dt);
+    this._jumpBuffer = Math.max(0, this._jumpBuffer - dt);
+    this._staminaDelay = Math.max(0, this._staminaDelay - dt);
+    this._iframes = Math.max(0, this._iframes - dt);
+  }
+
+  _handleActions(dt, input, wantMove, targetYaw) {
+    const s = this.game.state;
+
+    // Guard (hold) — grounded, not mid-action.
+    this.guarding = input.held('guard') && this.grounded && !this.busy && !this.swimming;
+
+    // Spin charge: holding attack after a swing finishes charges the spin.
+    if (input.held('attack') && !this.attack && !this.roll && !this.swimming && this._comboTimer <= 0 && this.charge >= 0) {
+      if (this._chargeArmed) this.charge += dt;
+    } else if (this.charge > 0 && !input.held('attack')) {
+      if (this.charge >= SPIN_CHARGE_TIME && s.stamina > 5) {
+        this.attack = { index: 'spin', t: 0, hitSet: new Set() };
+        this.spendStamina(STAMINA.spin);
+        this.game.events.emit('player:attack', { index: 'spin' });
+      }
+      this.charge = 0;
+      this._chargeArmed = false;
+    }
+
+    // Attack (edge) — combo chain.
+    if (input.pressed('attack') && !this.roll && !this.hurt && !this.swimming && !this.guarding) {
+      if (!this.attack) {
+        const index = this._comboTimer > 0 ? this._nextCombo : 0;
+        this.attack = { index, t: 0, hitSet: new Set() };
+        this._nextCombo = (index + 1) % 3;
+        this._chargeArmed = index === 0; // holding after first swing charges spin
+        if (wantMove) this.yaw = targetYaw; // snap toward intended direction
+        this.game.events.emit('player:attack', { index });
+      }
+    }
+
+    // Jump — buffered + coyote time.
+    if (input.pressed('jump')) this._jumpBuffer = 0.14;
+    if (this._jumpBuffer > 0 && (this.grounded || this._coyote > 0) && !this.busy && !this.swimming && !this.guarding) {
+      this._jumpBuffer = 0;
+      this._coyote = 0;
+      this.velocity.y = JUMP_VEL;
+      this.grounded = false;
+      this.spendStamina(STAMINA.jump);
+      this.game.events.emit('player:jump', { pos: this.position });
+    }
+
+    // Roll — dodge with i-frames.
+    if (input.pressed('roll') && this.grounded && !this.busy && !this.swimming && s.stamina > 5) {
+      const yaw = wantMove ? targetYaw : this.yaw;
+      this.roll = { t: 0, dirX: Math.sin(yaw), dirZ: Math.cos(yaw) };
+      this.attack = null;
+      this.charge = 0;
+      this.spendStamina(STAMINA.roll);
+      this.game.events.emit('player:roll', { pos: this.position });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  /** amount in quarter-hearts. Returns true if damage landed. */
+  takeDamage(amount, sourcePos = null, knockback = 7) {
+    const g = this.game;
+    if (!this.alive || this.invulnerable) return false;
+
+    // Guard: blocks frontal hits at reduced damage.
+    if (this.guarding && sourcePos) {
+      const toSrc = Math.atan2(sourcePos.x - this.position.x, sourcePos.z - this.position.z);
+      let d = toSrc - this.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      if (Math.abs(d) < 1.15) {
+        this.spendStamina(STAMINA.guardHit);
+        amount = Math.max(1, Math.floor(amount * 0.25));
+        g.events.emit('player:block', { pos: this.position });
+        this._applyKnockback(sourcePos, knockback * 0.5);
+        g.state.hp = Math.max(0, g.state.hp - amount);
+        g.events.emit('player:damage', { amount, hp: g.state.hp, blocked: true });
+        if (g.state.hp <= 0) this._die();
+        return true;
+      }
+    }
+
+    g.state.hp = Math.max(0, g.state.hp - amount);
+    this.hurt = { t: 0 };
+    this.attack = null;
+    this.charge = 0;
+    this._iframes = IFRAME_TIME;
+    if (sourcePos) this._applyKnockback(sourcePos, knockback);
+    g.cameraRig.shake(0.32);
+    g.events.emit('player:damage', { amount, hp: g.state.hp, blocked: false });
+    if (g.state.hp <= 0) this._die();
+    return true;
+  }
+
+  _applyKnockback(sourcePos, strength) {
+    const dx = this.position.x - sourcePos.x;
+    const dz = this.position.z - sourcePos.z;
+    const d = Math.hypot(dx, dz) || 1;
+    this.velocity.x = (dx / d) * strength;
+    this.velocity.z = (dz / d) * strength;
+  }
+
+  heal(quarterHearts) {
+    const s = this.game.state;
+    s.hp = Math.min(s.maxHp, s.hp + quarterHearts);
+    this.game.events.emit('player:heal', { hp: s.hp });
+  }
+
+  _drown() {
+    // Out of stamina in deep water: take damage, teleport to last dry land.
+    this.game.state.hp = Math.max(0, this.game.state.hp - 2);
+    this.game.events.emit('player:damage', { amount: 2, hp: this.game.state.hp, drown: true });
+    if (this.game.state.hp <= 0) { this._die(); return; }
+    const p = this._lastDry || { x: 0, z: 0 };
+    this.position.set(p.x, this.groundProvider.heightAt(p.x, p.z) + 0.5, p.z);
+    this.velocity.set(0, 0, 0);
+    this.game.state.stamina = this.game.state.maxStamina * 0.4;
+  }
+
+  _die() {
+    if (!this.alive) return;
+    this.alive = false;
+    this.game.events.emit('player:death', {});
+  }
+
+  respawn(x, z, yaw = 0) {
+    this.alive = true;
+    this.position.set(x, this.groundProvider.heightAt(x, z), z);
+    this.velocity.set(0, 0, 0);
+    this.yaw = yaw;
+    this.attack = this.roll = this.hurt = null;
+    this.charge = 0;
+    this._iframes = 1.2;
+    this.game.events.emit('player:respawn', {});
+  }
+
+  noteDryLand() {
+    if (this.grounded && !this.swimming) {
+      this._lastDry = { x: this.position.x, z: this.position.z };
+    }
   }
 }

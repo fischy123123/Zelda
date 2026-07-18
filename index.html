@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#0b0f17" />
-  <title>Legend of the Verdant Realm — a 3D open-world adventure</title>
-  <link rel="stylesheet" href="styles.css?v=14" />
-  <!-- No build tool: resolve bare module specifiers via an import map to a CDN -->
+  <meta name="theme-color" content="#0a0e16" />
+  <title>Aurelia — Legend of the Shattered Star</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>⚔️</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three": "./assets/vendor/three.module.js"
     }
   }
   </script>
@@ -21,65 +20,17 @@
 <body>
   <canvas id="game"></canvas>
 
-  <!-- HUD overlay -->
-  <div id="hud" class="hidden">
-    <div id="hearts" class="hud-row"></div>
-    <div id="stamina" class="hidden"></div>
-    <div id="wallet" class="hud-row">
-      <span class="rupee-icon"></span><span id="rupee-count">0</span>
-      <span class="key-icon"></span><span id="key-count">0</span>
-    </div>
-    <canvas id="minimap" width="150" height="150" class="hidden"></canvas>
-    <div id="objective" class="hidden"></div>
-    <div id="bossbar" class="hidden">
-      <div id="bossname"></div>
-      <div id="bosstrack"><div id="bossfill"></div></div>
-    </div>
-    <div id="region-splash" class="hidden"></div>
-    <div id="prompt" class="hidden"></div>
-    <div id="toast"></div>
+  <!-- Everything UI lives inside this root; js/ui/UI.js builds the DOM. -->
+  <div id="ui-root"></div>
+
+  <!-- Shown until the game boots; removed by js/main.js. -->
+  <div id="boot-splash">
+    <div class="boot-star">✦</div>
+    <div class="boot-title">AURELIA</div>
+    <div class="boot-sub">waking the realm…</div>
   </div>
+  <div id="boot-error"></div>
 
-  <!-- Dialogue box -->
-  <div id="dialogue" class="hidden">
-    <div id="dlg-name"></div>
-    <div id="dlg-text"></div>
-    <div id="dlg-hint">▼</div>
-  </div>
-
-  <!-- Inventory overlay -->
-  <div id="inventory" class="overlay hidden">
-    <h2>Inventory</h2>
-    <div id="inv-grid"></div>
-    <p class="hint">Press <kbd>I</kbd> or <kbd>Esc</kbd> to close</p>
-  </div>
-
-  <!-- Title / pause menu -->
-  <div id="menu" class="overlay">
-    <h1>Legend of the<br />Verdant Realm</h1>
-    <p class="subtitle">A 3D open-world adventure</p>
-    <div id="menu-buttons">
-      <button id="btn-continue" class="hidden">Continue</button>
-      <button id="btn-new">New Game</button>
-    </div>
-    <div id="controls-help">
-      <h3>Controls</h3>
-      <ul>
-        <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</li>
-        <li><kbd>Mouse</kbd> Look / orbit camera</li>
-        <li><kbd>Shift</kbd> Run &nbsp; <kbd>Space</kbd> Jump</li>
-        <li><kbd>Click</kbd> / <kbd>F</kbd> Swing sword</li>
-        <li><kbd>Tab</kbd> Lock-on &nbsp; <kbd>C</kbd> Dodge roll</li>
-        <li><kbd>Q</kbd> / <kbd>RMB</kbd> Hold to block (needs shield)</li>
-        <li><kbd>E</kbd> Interact (chests, people, doors)</li>
-        <li><kbd>I</kbd> Inventory &nbsp; <kbd>Esc</kbd> Pause</li>
-      </ul>
-      <p class="mobile-tip">📱 On phones: use the on-screen stick &amp; buttons — landscape is best.</p>
-    </div>
-  </div>
-
-  <div id="loading">Loading the realm…</div>
-
-  <script type="module" src="js/main.js?v=14"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>

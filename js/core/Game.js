@@ -1,710 +1,333 @@
-import * as THREE from 'three';
-import { Input } from './Input.js?v=14';
-import { SaveManager } from './SaveManager.js?v=14';
-import { AudioSys } from './Audio.js?v=14';
-import { World } from '../world/World.js?v=14';
-import { Dungeon } from '../world/Dungeon.js?v=14';
-import { Player } from '../entities/Player.js?v=14';
-import { ThirdPersonCamera } from '../systems/ThirdPersonCamera.js?v=14';
-import { Inventory } from '../systems/Inventory.js?v=14';
-import { Combat } from '../systems/Combat.js?v=14';
-import { QUESTS } from '../systems/Quests.js?v=14';
-import { Pickup } from '../entities/Pickup.js?v=14';
-import { Particles, Shake } from '../gfx/Effects.js?v=14';
-import { HUD } from '../ui/HUD.js?v=14';
-import { InventoryUI } from '../ui/InventoryUI.js?v=14';
-import { Menu } from '../ui/Menu.js?v=14';
-import { Dialogue } from '../ui/Dialogue.js?v=14';
-import { Minimap } from '../ui/Minimap.js?v=14';
-import { TouchControls } from '../ui/TouchControls.js?v=14';
-import { createComposer } from '../gfx/PostFX.js?v=14';
+// The orchestrator: owns the renderer, scene, module lifecycle and the main
+// loop. Every subsystem hangs off this object — `game` is the shared context
+// passed to all module constructors (see docs/CONTRACTS.md).
 
-const STATE = { TITLE: 'title', PLAYING: 'playing', PAUSED: 'paused', INVENTORY: 'inventory', DIALOGUE: 'dialogue' };
-const PLAYER_RADIUS = 0.5;
-const AUTOSAVE_INTERVAL = 12; // seconds
+import * as THREE from 'three';
+import { Emitter } from '../util/events.js';
+import { clamp, damp } from '../util/math.js';
+import { windUniforms } from '../gfx/Toon.js';
+import { Input } from './Input.js';
+import { Colliders } from './Colliders.js';
+import { Save } from './Save.js';
+import { Terrain } from '../world/Terrain.js';
+import { World } from '../world/World.js';
+import { SPAWN, SITES, WORLD } from '../world/layout.js';
+import { Player } from '../entities/Player.js';
+import { ThirdPersonCamera } from '../systems/Camera.js';
+import { Combat } from '../systems/Combat.js';
+import { Interact } from '../systems/Interact.js';
+// Module teams (built against docs/CONTRACTS.md):
+import { Sky } from '../gfx/Sky.js';
+import { Water } from '../gfx/Water.js';
+import { Vegetation } from '../gfx/Vegetation.js';
+import { Particles } from '../gfx/Particles.js';
+import { PostFX } from '../gfx/PostFX.js';
+import { HeroModel } from '../entities/HeroModel.js';
+import { Village } from '../world/Village.js';
+import { Dungeon } from '../world/Dungeon.js';
+import { Quests } from '../systems/Quests.js';
+import { AudioEngine } from './AudioEngine.js';
+import { UI } from '../ui/UI.js';
+
+function freshState() {
+  return {
+    hp: 12, maxHp: 12,             // quarter-hearts (12 = 3 hearts)
+    stamina: 100, maxStamina: 100,
+    gems: 0, keys: 0,
+    sword: 'bronze',
+    items: { potion: 1 },
+    quests: {},
+    flags: {},
+    day: 1,
+    playTime: 0,
+  };
+}
 
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
-    this.state = STATE.TITLE;
-    this.autosaveTimer = 0;
-    this.openedChestIds = new Set();
-    this.quest = 0;
-    this.lockEnemy = null;
-    this.hitstop = 0;
-    this._region = null;
+    this.events = new Emitter();
+    this.state = freshState();
+    this.mode = 'title';            // title | playing | dead
+    this.modals = new Set();        // 'pause' | 'dialogue' | 'inventory' | ...
+    this.inDungeon = false;
+    this.enemies = [];
+    this.pickups = [];
+    this.timeScale = 1;
+    this._hitstop = 0;
+    this.quality = this._detectQuality();
+    this.debug = new URLSearchParams(location.search).has('debug');
 
-    // ---- Device / quality detection (mobile-first performance) ----
-    const coarse = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)
-      || (navigator.maxTouchPoints || 0) > 0;
-    this.isMobile = coarse && Math.min(window.innerWidth, window.innerHeight) < 1100;
-    this.quality = this.isMobile
-      ? { pixelRatio: 1.35, samples: 0, ao: false, smaa: false, grass: 4200, shadowMap: 1024, propScale: 0.5, fireflies: 70, lights: false, particles: 40 }
-      : { pixelRatio: 2, samples: 4, ao: true, smaa: true, grass: 16000, shadowMap: 4096, propScale: 1, fireflies: 200, lights: true, particles: 90 };
-
-    // ---- Renderer / scene / camera ----
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.pixelRatio));
+    // --- renderer -----------------------------------------------------------
+    this.renderer = new THREE.WebGLRenderer({
+      canvas, antialias: this.quality !== 'low', powerPreference: 'high-performance',
+    });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.clock = new THREE.Clock();
+    this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2200);
+    this._resize();
+    window.addEventListener('resize', () => this._resize());
 
-    const fx = createComposer(this.renderer, this.scene, this.camera, this.quality);
-    this.composer = fx.composer;
-    this.bloom = fx.bloom;
-
-    // ---- Systems / UI ----
+    // --- core systems -------------------------------------------------------
     this.input = new Input(canvas);
-    this.audio = new AudioSys();
-    const unlock = () => this.audio.unlock();
-    window.addEventListener('pointerdown', unlock, { passive: true });
-    window.addEventListener('keydown', unlock);
+    this.colliders = new Colliders();
+    this.terrain = new Terrain(this.scene);
+    this.player = new Player(this);
+    this.cameraRig = new ThirdPersonCamera(this.camera, this.terrain);
+    this.combat = new Combat(this);
+    this.interact = new Interact(this);
 
-    this.inventory = new Inventory();
-    this.hud = new HUD();
-    this.dialogue = new Dialogue();
-    this.minimap = new Minimap();
-    this.inventoryUI = new InventoryUI(this.inventory, () => this.applyEquipment());
-    this.menu = new Menu({
-      onNewGame: () => { this.audio.sfx('click'); this.newGame(); },
-      onContinue: () => { this.audio.sfx('click'); this.onContinue(); },
-    });
-    this.touch = this.input.isTouch ? new TouchControls(this.input) : null;
+    // --- module teams -------------------------------------------------------
+    this.sky = new Sky(this);
+    this.water = new Water(this);
+    this.vegetation = new Vegetation(this);
+    this.particles = new Particles(this);
+    this.audio = new AudioEngine(this);
+    this.world = new World(this);
+    this.village = new Village(this);
+    this.dungeon = new Dungeon(this);
+    this.quests = new Quests(this);
 
-    // Combat feedback: sparks + camera shake + Z-target reticle.
-    this.particles = new Particles(this.scene, this.quality.particles);
-    this.shake = new Shake();
-    this.reticle = new THREE.Mesh(
-      new THREE.TorusGeometry(0.42, 0.05, 8, 24),
-      new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.95, depthTest: false, toneMapped: false })
-    );
-    this.reticle.renderOrder = 999;
-    this.reticle.visible = false;
-    this.scene.add(this.reticle);
+    this.hero = new HeroModel(this);
+    this.player.model = this.hero;
+    this.scene.add(this.hero.group);
 
-    this.activeArea = null;
-    this.areas = {};
+    this.postfx = new PostFX(this);
+    this.ui = new UI(this);
 
-    window.addEventListener('resize', () => this.onResize());
-    this.menu.show('title', SaveManager.has());
+    // --- spawn --------------------------------------------------------------
+    this.player.respawn(SPAWN.x, SPAWN.z, Math.PI);
+    this.cameraRig.snapBehind(this.player, 0.3);
+
+    // First user gesture unlocks audio.
+    const unlock = () => { this.audio.resume?.(); };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+
+    this._wireEvents();
+
+    this._clock = new THREE.Clock();
+    this._accumSave = 0;
+    this.renderer.setAnimationLoop(() => this._frame());
   }
 
-  // ---------- lifecycle ----------
-  onContinue() {
-    if (this.state === STATE.PAUSED) { this.resume(); return; }
-    this.loadGame();
-  }
+  // -------------------------------------------------------------------------
+  get uiBlocked() { return this.mode !== 'playing' || this.modals.size > 0; }
+  get paused() { return this.modals.has('pause'); }
 
+  pushModal(name) { this.modals.add(name); this.events.emit('modal', { name, open: true }); }
+  popModal(name) { this.modals.delete(name); this.events.emit('modal', { name, open: false }); }
+
+  hitstop(seconds) { this._hitstop = Math.max(this._hitstop, seconds); }
+
+  setGroundProvider(p) { this.player.groundProvider = p || this.terrain; }
+
+  // --- game flow ------------------------------------------------------------
   newGame() {
-    SaveManager.clear();
-    this.openedChestIds = new Set();
-    this.inventory = new Inventory();
-    this.inventory.add('sword');
-    this.inventoryUI.inventory = this.inventory;
-
-    this._buildAreas();
-    this._resetPlayer();
-    this.cameraController = new ThirdPersonCamera(this.camera, this.areas.overworld.terrain, { autoFollow: this.input.isTouch });
-
-    this.applyEquipment();
-    this.setActiveArea(this.areas.overworld, this.areas.overworld.spawn);
-    this.setQuest(0, { silent: true });
-    this.minimap.init(this.areas.overworld);
-    this.startPlaying();
-    this.hud.toast('Welcome to the Verdant Realm!');
+    Save.clear();
+    this.state = freshState();
+    this.mode = 'playing';
+    this.inDungeon = false;
+    this.setGroundProvider(this.terrain);
+    this.sky.setTimeOfDay?.(0.33);
+    this.player.respawn(SPAWN.x, SPAWN.z, Math.PI);
+    this.hero.setSword?.('bronze');
+    this.cameraRig.snapBehind(this.player, 0.3);
+    this.events.emit('game:start', { fresh: true });
   }
 
-  loadGame() {
-    const data = SaveManager.load();
+  continueGame() {
+    const data = Save.read();
     if (!data) { this.newGame(); return; }
-
-    this.openedChestIds = new Set(data.openedChestIds || []);
-    this.inventory = new Inventory();
-    this.inventory.fromJSON(data.inventory);
-    this.inventoryUI.inventory = this.inventory;
-
-    this._buildAreas();
-    if (data.dungeon?.unlocked) this.areas.dungeon.unlock();
-    this.areas.dungeon.cleared = !!data.dungeon?.cleared;
-    if (typeof data.timeOfDay === 'number') this.areas.overworld.dayTime = data.timeOfDay;
-    this._applyChestState();
-
-    this._resetPlayer();
-    this.player.maxHealth = data.player?.maxHealth ?? 6;
-    this.player.health = data.player?.health ?? this.player.maxHealth;
-    this.cameraController = new ThirdPersonCamera(this.camera, this.areas.overworld.terrain, { autoFollow: this.input.isTouch });
-    this.applyEquipment();
-
-    const area = data.area === 'dungeon' ? this.areas.dungeon : this.areas.overworld;
-    const pos = data.player
-      ? new THREE.Vector3(data.player.x, data.player.y, data.player.z)
-      : area.spawn;
-    this.setActiveArea(area, pos);
-    this.setQuest(data.quest ?? 0, { silent: true });
-    this.minimap.init(this.areas.overworld);
-    this.startPlaying();
-    this.hud.toast('Welcome back, hero.');
+    this.state = { ...freshState(), ...data.state };
+    this.mode = 'playing';
+    this.inDungeon = false;
+    this.setGroundProvider(this.terrain);
+    this.sky.setTimeOfDay?.(data.timeOfDay ?? 0.33);
+    const px = data.player?.x ?? SPAWN.x, pz = data.player?.z ?? SPAWN.z;
+    this.player.respawn(px, pz, data.player?.yaw ?? 0);
+    this.hero.setSword?.(this.state.sword);
+    this.cameraRig.snapBehind(this.player);
+    this.quests.restore?.();
+    this.events.emit('game:start', { fresh: false });
   }
 
-  _buildAreas() {
-    for (const a of Object.values(this.areas)) {
-      if (a.group.parent) this.scene.remove(a.group);
+  save() { return Save.write(this); }
+  hasSave() { return Save.exists(); }
+
+  respawnPlayer() {
+    // After death: back to the village with most hearts restored.
+    this.mode = 'playing';
+    if (this.inDungeon) this.dungeon.exit?.(true);
+    this.state.hp = Math.max(8, Math.floor(this.state.maxHp * 0.75));
+    this.state.stamina = this.state.maxStamina;
+    this.player.respawn(SPAWN.x, SPAWN.z, Math.PI);
+    this.cameraRig.snapBehind(this.player, 0.3);
+  }
+
+  useItem(id) {
+    const s = this.state;
+    if (!s.items[id]) return false;
+    if (id === 'potion') {
+      if (s.hp >= s.maxHp) { this.events.emit('toast', { text: 'Hearts are already full!' }); return false; }
+      s.items.potion--;
+      this.player.heal(12);
+      this.events.emit('item:used', { id });
+      return true;
     }
-    this.areas = { overworld: new World(this.renderer, this.quality), dungeon: new Dungeon(this.renderer) };
+    return false;
   }
 
-  _resetPlayer() {
-    if (this.player) this.scene.remove(this.player.group);
-    this.player = new Player(this.areas.overworld.terrain);
-    this.scene.add(this.player.group);
-    this._wasRolling = false;
+  addMaxHeart() {
+    this.state.maxHp += 4;
+    this.state.hp = this.state.maxHp;
+    this.events.emit('player:heal', { hp: this.state.hp, container: true });
   }
 
-  _applyChestState() {
-    for (const area of Object.values(this.areas)) {
-      for (const chest of area.chests) {
-        if (this.openedChestIds.has(chest.id)) {
-          chest.opened = true;
-          chest.lidAngle = -Math.PI * 0.6;
-          chest.lid.rotation.x = chest.lidAngle;
-        }
-      }
-    }
-  }
-
-  startPlaying() {
-    this.state = STATE.PLAYING;
-    this.menu.hide();
-    this.inventoryUI.close();
-    this.hud.show();
-    this.touch?.show();
-    document.getElementById('loading').classList.add('hidden');
-  }
-
-  pause() {
-    this.state = STATE.PAUSED;
-    this.input.releaseLock();
-    this.menu.show('pause', true);
-  }
-
-  resume() {
-    this.state = STATE.PLAYING;
-    this.menu.hide();
-  }
-
-  // ---------- quest line ----------
-  setQuest(i, { silent = false } = {}) {
-    this.quest = i;
-    this.hud.setObjective(QUESTS[i]?.objective || null);
-    if (!silent) {
-      this.audio.sfx('quest');
-      this.hud.toast('Objective updated');
-    }
-  }
-
-  // One-way progression for world-event milestones.
-  milestone(n) { if (this.quest < n) this.setQuest(n); }
-
-  talkTo(id) {
-    let name = '???', lines = ['...'], after = null;
-    if (id === 'elder') {
-      name = 'Elder Maru';
-      if (this.quest === 0) {
-        lines = [
-          'Ah… a traveler, at last. Our realm withers under a shadow.',
-          'A dark power festers in the Sunken Vault — the glowing arch beyond the north-east hills.',
-          'Bring back the Shard of Power sealed within, and the Verdant Realm may yet bloom again.',
-        ];
-        after = () => this.setQuest(1);
-      } else if (this.quest === 5) {
-        lines = [
-          'The Shard! By the old light… you truly did it, hero.',
-          'The realm owes you everything. Take these rupees — and our gratitude, always.',
-        ];
-        after = () => {
-          this.inventory.addRupees(100);
-          this.audio.sfx('fanfare');
-          this.hud.toast('+100 rupees!');
-          this.setQuest(6);
-          this.save();
-        };
-      } else if (this.quest === 6) {
-        lines = ['The realm breathes easy again. Rest, hero — you have earned it.'];
-      } else {
-        lines = [
-          'The vault lies to the north-east — follow the glowing arch on your map.',
-          'Its inner gate answers only to a small key. One of the brutes inside carries it.',
-        ];
-      }
-    } else if (id === 'lin') {
-      name = 'Lin';
-      lines = this.areas.overworld.isNight
-        ? ['The fireflies come out after dusk… aren\'t they pretty?', 'Papa says the moblins get bolder at night. Be careful!']
-        : ['I saw a BLUE rupee hiding in the tall grass once. Really!', 'If you hold your shield up, the moblins can\'t hurt you. Papa taught me that.'];
-    }
-    this.audio.sfx('talk');
-    this.state = STATE.DIALOGUE;
-    this.hud.setPrompt(null);
-    this.dialogue.show(name, lines, () => {
-      this.state = STATE.PLAYING;
-      after && after();
+  _wireEvents() {
+    this.events.on('player:death', () => {
+      this.mode = 'dead';
+      this.cameraRig.shake(0.5);
     });
   }
 
-  // ---------- area switching ----------
-  setActiveArea(area, spawnPos) {
-    this._clearLock();
-    if (this.activeArea) this.scene.remove(this.activeArea.group);
-    this.activeArea = area;
-    this.scene.add(area.group);
-    this.scene.background = area.background;
-    this.scene.fog = area.fog;
-    this.scene.environment = area.environment ?? null;
-    const bloomScale = this.isMobile ? 0.8 : 1;
-    if (this.bloom) this.bloom.strength = (area.name === 'dungeon' ? 0.95 : 0.6) * bloomScale;
+  // -------------------------------------------------------------------------
+  _frame() {
+    const rawDt = Math.min(this._clock.getDelta(), 0.05);
 
-    this.player.terrain = area.terrain;
-    this.cameraController.terrain = area.terrain;
-    this.player.group.position.copy(spawnPos);
-    this.player.velocityY = 0;
-    this.player.grounded = true;
-    this.cameraController.snap(this.player);
-    this.minimap.setVisible(area.name === 'overworld');
-  }
-
-  enterDungeon() {
-    this.setActiveArea(this.areas.dungeon, this.areas.dungeon.spawn);
-    this.audio.sfx('portal');
-    this.hud.splashRegion('The Sunken Vault');
-    this.milestone(2);
-    this.save();
-  }
-
-  exitDungeon() {
-    const ow = this.areas.overworld;
-    const exitPos = ow.entrancePos.clone();
-    exitPos.z += 6;
-    exitPos.y = ow.terrain.getHeightAt(exitPos.x, exitPos.z);
-    this.setActiveArea(ow, exitPos);
-    this.audio.sfx('portal');
-    this._region = null; // re-splash the region name
-    this.save();
-  }
-
-  // ---------- interactions ----------
-  openChest(chest) {
-    if (!chest.open()) return;
-    this.openedChestIds.add(chest.id);
-    this.audio.sfx('chest');
-    const r = chest.reward;
-    if (r.rupees) {
-      this.inventory.addRupees(r.rupees);
-      this.hud.toast(`Found ${r.rupees} rupees!`);
-    }
-    if (r.itemId) {
-      this.inventory.add(r.itemId, r.count || 1);
-      const def = this.inventory.list().find((x) => x.def.id === r.itemId)?.def;
-      this.hud.toast(`Got ${def ? def.name : r.itemId}!`);
-      this.applyEquipment();
-    }
-    if (r.alsoHeart) {
-      this.player.maxHealth += 2;
-      this.player.health = this.player.maxHealth;
-      this.hud.toast('Heart Container — max health up!');
-    }
-    if (chest === this.areas.dungeon.rewardChest) {
-      this.areas.dungeon.cleared = true;
-      this.audio.sfx('fanfare');
-      this.hud.toast('You claimed the Shard of Power!');
-      this.milestone(5);
-    }
-    this.save();
-  }
-
-  tryUnlockGate(dungeon) {
-    if (dungeon.unlocked) return;
-    if (this.inventory.useKey()) {
-      dungeon.unlock();
-      this.audio.sfx('unlock');
-      this.hud.toast('The golden gate rises!');
-      this.save();
+    // Hitstop: world time briefly crawls for impact.
+    if (this._hitstop > 0) {
+      this._hitstop -= rawDt;
+      this.timeScale = damp(this.timeScale, 0.08, 30, rawDt);
     } else {
-      this.audio.sfx('click');
-      this.hud.toast('It is locked. A key must be near…');
-    }
-  }
-
-  applyEquipment() {
-    if (!this.player) return;
-    this.player.hasShield = this.inventory.equipped.offhand === 'shield';
-    this.player.swordDamage = 1;
-  }
-
-  // ---------- per-frame update ----------
-  update() {
-    const rawDt = Math.min(this.clock.getDelta(), 0.05);
-    const elapsed = this.clock.getElapsedTime();
-    // Hit-stop: freeze-frame flavor on sword impact.
-    let dt = rawDt;
-    if (this.hitstop > 0) {
-      this.hitstop -= rawDt;
-      dt = rawDt * 0.12;
+      this.timeScale = damp(this.timeScale, 1, 14, rawDt);
     }
 
-    if (this.state === STATE.PLAYING) {
-      this._handleGlobalKeys();
-      this._updatePlaying(dt, elapsed);
-    } else if (this.state === STATE.DIALOGUE) {
-      this.dialogue.tick(rawDt, this.input);
-    } else if (this.state === STATE.INVENTORY) {
-      if (this.input.wasPressed('KeyI') || this.input.wasPressed('Escape')) {
-        this.inventoryUI.close();
-        this.state = STATE.PLAYING;
-      }
-    } else if (this.state === STATE.PAUSED) {
-      if (this.input.wasPressed('Escape')) this.resume();
-    }
+    const frozen = this.paused || this.modals.has('dialogue') || this.modals.has('inventory');
+    const dt = frozen ? 0 : rawDt * this.timeScale;
 
+    this.input.poll();
+    windUniforms.time.value += dt;
+
+    if (this.mode === 'playing') this._playFrame(dt, rawDt);
+    else if (this.mode === 'title') this._titleFrame(rawDt);
+    else if (this.mode === 'dead') this._deadFrame(rawDt);
+
+    // Systems that always tick (visuals stay alive behind menus).
+    this.sky.update(dt || rawDt * 0.15, this.player.position);
+    this.water.update(dt || rawDt, this.camera);
+    this.vegetation.update(dt || rawDt, this.player.position);
+    this.particles.update(rawDt);
+    this.audio.update(rawDt);
+    this.ui.update(rawDt);
+
+    this.postfx.render(rawDt);
     this.input.endFrame();
-    if (this.composerBroken) {
-      this.renderer.render(this.scene, this.camera);
-    } else {
-      try {
-        this.composer.render();
-      } catch (e) {
-        console.error('[Game] post-processing failed, falling back to direct render:', e);
-        this.composerBroken = true;
-        this.renderer.render(this.scene, this.camera);
+  }
+
+  _playFrame(dt, rawDt) {
+    const s = this.state;
+    s.playTime += dt;
+
+    // Global input handling.
+    if (this.input.pressed('pause')) {
+      if (this.modals.has('pause')) this.popModal('pause');
+      else if (this.modals.size === 0) this.pushModal('pause');
+    }
+    if (!this.uiBlocked) {
+      if (this.input.pressed('inventory')) this.pushModal('inventory');
+      if (this.input.pressed('lockon')) this.combat.toggleLockOn();
+      if (this.input.pointerLocked === false && !this.input.usingTouch && !this.input.usingGamepad) {
+        // Click to (re)capture the mouse during play.
+        if (this.input.pressed('attack')) this.input.requestPointerLock();
       }
     }
-  }
 
-  _handleGlobalKeys() {
-    if (this.input.wasPressed('Escape')) { this.pause(); return; }
-    if (this.input.wasPressed('KeyI')) {
-      this.state = STATE.INVENTORY;
-      this.input.releaseLock();
-      this.inventoryUI.show();
-    }
-  }
+    if (dt > 0) {
+      this.player.update(dt);
+      this.player.noteDryLand();
 
-  _updatePlaying(dt, elapsed) {
-    const area = this.activeArea;
-    const pp = this.player.group.position;
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        const e = this.enemies[i];
+        e.update(dt, this);
+        if (e.removed) this.enemies.splice(i, 1);
+      }
 
-    // Attack input.
-    if ((this.input.consumeClick() || this.input.wasPressed('KeyF')) && !this.player.attacking) {
-      this.player.startAttack();
-      this.audio.sfx('swing');
-    }
+      this.combat.update(dt);
+      this.world.update(dt);
+      this.world.updateChests(dt);
+      this.village.update(dt);
+      this.dungeon.update(dt);
+      this.quests.update?.(dt);
 
-    // Z-target lock-on.
-    if (this.input.wasPressed('Tab')) this._toggleLock(area);
-    if (this.lockEnemy && (this.lockEnemy.dead || this.lockEnemy.mesh.position.distanceTo(pp) > 26)) {
-      this._clearLock();
-    }
+      for (let i = this.pickups.length - 1; i >= 0; i--) {
+        const p = this.pickups[i];
+        p.update(dt);
+        if (!p.alive) this.pickups.splice(i, 1);
+      }
 
-    this.cameraController.updateFromInput(this.input, dt);
-    this.player.update(dt, this.input, this.cameraController);
-    this._resolveCollisions(pp, area.colliders);
+      this.interact.update();
 
-    // Roll feedback (sound + dust).
-    if (this.player.justRolled) {
-      this.player.justRolled = false;
-      this.audio.sfx('roll');
-      this.particles.burst(pp.clone(), 0xcbb48a, 6, 2.5, 0.4, 0.26);
-    }
+      // Day counter driven by the sky's clock.
+      if (this.sky.dayRolledOver) {
+        s.day += 1;
+        this.events.emit('day', { day: s.day });
+      }
 
-    // ---- Combat with feedback events ----
-    const ev = Combat.resolve(this.player, area.enemies, dt);
-    for (const h of ev.hits) {
-      this.audio.sfx('hit');
-      this.particles.burst(h.position, 0xffe08a, 8, 5, 0.4);
-      this.hitstop = Math.max(this.hitstop, 0.055);
-      this.shake.add(0.22);
-    }
-    for (const k of ev.kills) {
-      const at = k.position.clone();
-      at.y += 1;
-      this.particles.burst(at, 0xcfe8ff, 16, 6, 0.6);
-      this._spawnDrops(area, k);
-      if (k.isBoss) {
-        this.audio.sfx('fanfare');
-        this.hud.toast('Gorlok the Vault-Keeper is vanquished!');
-        this.shake.add(0.65);
-        this.milestone(4);
-        this.save();
+      // Periodic autosave near the village.
+      this._accumSave += dt;
+      if (this._accumSave > 20) {
+        this._accumSave = 0;
+        const dv = Math.hypot(this.player.position.x - SITES.village.x, this.player.position.z - SITES.village.z);
+        if (dv < SITES.village.r && this.player.alive && !this.inDungeon) this.save();
       }
     }
-    if (ev.playerHit) {
-      this.audio.sfx('hurt');
-      this.shake.add(0.45);
-      const at = pp.clone();
-      at.y += 1.2;
-      this.particles.burst(at, 0xff6a5a, 10, 4, 0.5);
-    }
-    if (ev.blocked) {
-      this.audio.sfx('block');
-      const at = pp.clone();
-      at.y += 1.1;
-      this.particles.burst(at, 0x9ecbff, 8, 4, 0.35);
-      this.shake.add(0.12);
-    }
-    this._removeDeadEnemies(area);
 
-    // Pickups.
-    this._updatePickups(area, dt);
-
-    // Ambient world + shadow focus.
-    area.setShadowFocus(pp);
-    area.update(dt, elapsed);
-
-    // Interactions.
-    this._updateInteractions(area);
-
-    // Camera, shake, reticle.
-    this.cameraController.follow(this.player, dt);
-    this.shake.update(dt, this.camera);
-    if (this.lockEnemy) {
-      const em = this.lockEnemy.mesh;
-      this.reticle.position.copy(em.position);
-      this.reticle.position.y += 2.3 * em.scale.y;
-      this.reticle.quaternion.copy(this.camera.quaternion);
-      const pulse = 1 + Math.sin(elapsed * 7) * 0.12;
-      this.reticle.scale.setScalar(pulse);
-    }
-
-    // FX + HUD.
-    this.particles.update(dt);
-    this.hud.update(this.player, this.inventory);
-    this._updateBossBar(area, pp);
-    if (area.name === 'overworld') {
-      this.minimap.draw(area, pp, this.player.facing, area.enemies);
-      const rn = area.regionAt(pp);
-      if (rn !== this._region) {
-        this._region = rn;
-        this.hud.splashRegion(rn);
-      }
-    }
-    this._syncMood();
-
-    // Death — forgiving respawn.
-    if (this.player.health <= 0) this._onDeath();
-
-    // Autosave.
-    this.autosaveTimer += dt;
-    if (this.autosaveTimer >= AUTOSAVE_INTERVAL) {
-      this.autosaveTimer = 0;
-      this.save();
-    }
+    this.cameraRig.update(rawDt, this.input, this.player, this.timeScale);
   }
 
-  _updateBossBar(area, pp) {
-    let boss = null;
-    for (const e of area.enemies) {
-      if (e.isBoss && !e.dead) { boss = e; break; }
-    }
-    if (boss && boss.mesh.position.distanceTo(pp) < 26) {
-      this.hud.setBoss(boss.displayName || 'Boss', boss.hp / boss.maxHp);
-    } else {
-      this.hud.setBoss(null);
-    }
-  }
-
-  _syncMood() {
-    const target = this.activeArea.name === 'dungeon'
-      ? 'dungeon'
-      : (this.areas.overworld.dayFactor > 0.4 ? 'day' : 'night');
-    if (this.audio.mood !== target) this.audio.setMood(target);
-  }
-
-  _toggleLock(area) {
-    if (this.lockEnemy) { this._clearLock(); return; }
-    const pp = this.player.group.position;
-    let best = null, bestD = 20;
-    for (const e of area.enemies) {
-      if (e.dead) continue;
-      const d = e.mesh.position.distanceTo(pp);
-      if (d < bestD) { bestD = d; best = e; }
-    }
-    if (best) {
-      this.lockEnemy = best;
-      this.player.lockTarget = best;
-      this.cameraController.lockTarget = best;
-      this.reticle.visible = true;
-      this.audio.sfx('lock');
-    }
-  }
-
-  _clearLock() {
-    this.lockEnemy = null;
-    if (this.player) this.player.lockTarget = null;
-    if (this.cameraController) this.cameraController.lockTarget = null;
-    if (this.reticle) this.reticle.visible = false;
-  }
-
-  _spawnDrops(area, drop) {
-    if (drop.dropsKey) {
-      const p = new Pickup('key', drop.position.x, drop.position.y + 0.6, drop.position.z);
-      area.pickups.push(p);
-      area.group.add(p.mesh);
-    }
-    if (Math.random() < 0.3) {
-      const p = new Pickup('heart', drop.position.x + 0.4, drop.position.y + 0.6, drop.position.z);
-      area.pickups.push(p);
-      area.group.add(p.mesh);
-    } else {
-      const p = new Pickup('rupee', drop.position.x, drop.position.y + 0.6, drop.position.z, {
-        color: drop.rupeeColor, value: drop.rupeeValue,
-      });
-      area.pickups.push(p);
-      area.group.add(p.mesh);
-    }
-  }
-
-  _removeDeadEnemies(area) {
-    for (let i = area.enemies.length - 1; i >= 0; i--) {
-      const e = area.enemies[i];
-      if (e.dead) {
-        if (e === this.lockEnemy) this._clearLock();
-        area.group.remove(e.mesh);
-        e.dispose();
-        area.enemies.splice(i, 1);
-      }
-    }
-  }
-
-  _updatePickups(area, dt) {
-    for (let i = area.pickups.length - 1; i >= 0; i--) {
-      const p = area.pickups[i];
-      p.update(dt, this.player.group.position);
-      if (p.collected) {
-        this._collect(p);
-        area.group.remove(p.mesh);
-        p.dispose();
-        area.pickups.splice(i, 1);
-      }
-    }
-  }
-
-  _collect(p) {
-    if (p.type === 'rupee') {
-      this.inventory.addRupees(p.value);
-      this.audio.sfx('rupee');
-      this.hud.toast(`+${p.value} rupee${p.value > 1 ? 's' : ''}`);
-    } else if (p.type === 'heart') {
-      this.player.heal(2);
-      this.audio.sfx('heart');
-      this.hud.toast('Recovered a heart');
-    } else if (p.type === 'key') {
-      this.inventory.add('key', 1);
-      this.audio.sfx('key');
-      this.hud.toast('Found a Small Key!');
-      this.milestone(3);
-    } else if (p.type === 'item' && p.itemId) {
-      this.inventory.add(p.itemId);
-      this.hud.toast(`Got ${p.itemId}!`);
-    }
-  }
-
-  _updateInteractions(area) {
-    let nearest = null;
-    let nearestDist = Infinity;
-    const pp = this.player.group.position;
-    for (const it of area.interactables) {
-      const prompt = it.getPrompt(this);
-      if (!prompt) continue;
-      const d = pp.distanceTo(it.position);
-      if (d <= it.range && d < nearestDist) {
-        nearest = it;
-        nearestDist = d;
-      }
-    }
-    this.hud.setPrompt(nearest ? nearest.getPrompt(this) : null);
-    if (nearest && this.input.wasPressed('KeyE')) {
-      nearest.interact(this);
-    }
-  }
-
-  _onDeath() {
-    this.audio.sfx('die');
-    this._clearLock();
-    this.player.health = this.player.maxHealth;
-    const spawn = this.activeArea.spawn.clone();
-    spawn.y = this.activeArea.terrain.getHeightAt(spawn.x, spawn.z);
-    this.player.group.position.copy(spawn);
-    this.player.knockback.set(0, 0, 0);
-    this.player.invuln = 1.5;
-    this.cameraController.snap(this.player);
-    this.hud.toast('You fell… and awoke back at the village.');
-    this.save();
-  }
-
-  // ---------- persistence ----------
-  snapshot() {
-    const pp = this.player.group.position;
-    return {
-      area: this.activeArea.name,
-      quest: this.quest,
-      timeOfDay: this.areas.overworld.dayTime,
-      player: {
-        x: pp.x, y: pp.y, z: pp.z,
-        health: this.player.health,
-        maxHealth: this.player.maxHealth,
-      },
-      inventory: this.inventory.toJSON(),
-      openedChestIds: [...this.openedChestIds],
-      dungeon: {
-        unlocked: this.areas.dungeon.unlocked,
-        cleared: this.areas.dungeon.cleared,
-      },
-    };
-  }
-
-  save() {
-    if (!this.player) return;
-    SaveManager.save(this.snapshot());
-  }
-
-  onResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+  _titleFrame(rawDt) {
+    // Attract mode: slow aerial drift over the valley.
+    const t = performance.now() * 0.001;
+    const a = t * 0.03;
+    const r = 150;
+    this.camera.position.set(
+      SITES.village.x + Math.sin(a) * r,
+      this.terrain.heightAt(SITES.village.x + Math.sin(a) * r, SITES.village.z + Math.cos(a) * r) + 45,
+      SITES.village.z + Math.cos(a) * r
+    );
+    this.camera.lookAt(SITES.village.x, 18, SITES.village.z);
+    this.camera.fov = damp(this.camera.fov, 50, 2, rawDt);
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.composer.setSize(window.innerWidth, window.innerHeight);
+    // Let the world simulate lightly so the vista is alive.
+    for (const e of this.enemies) e.update(rawDt * 0.5, this);
   }
 
-  // ---------- collision ----------
-  _resolveCollisions(pos, colliders) {
-    if (!colliders || colliders.length === 0) return;
-    for (const c of colliders) {
-      const cx = THREE.MathUtils.clamp(pos.x, c.minX, c.maxX);
-      const cz = THREE.MathUtils.clamp(pos.z, c.minZ, c.maxZ);
-      const dx = pos.x - cx;
-      const dz = pos.z - cz;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < PLAYER_RADIUS * PLAYER_RADIUS) {
-        if (d2 > 1e-6) {
-          const d = Math.sqrt(d2);
-          const push = PLAYER_RADIUS - d;
-          pos.x += (dx / d) * push;
-          pos.z += (dz / d) * push;
-        } else {
-          const left = pos.x - c.minX, right = c.maxX - pos.x;
-          const front = pos.z - c.minZ, back = c.maxZ - pos.z;
-          const min = Math.min(left, right, front, back);
-          if (min === left) pos.x = c.minX - PLAYER_RADIUS;
-          else if (min === right) pos.x = c.maxX + PLAYER_RADIUS;
-          else if (min === front) pos.z = c.minZ - PLAYER_RADIUS;
-          else pos.z = c.maxZ + PLAYER_RADIUS;
-        }
-      }
-    }
+  _deadFrame(rawDt) {
+    // Slow orbit around the fallen hero while the UI shows the death screen.
+    this.player.update(rawDt * 0.2);
+    this.cameraRig.update(rawDt, { look: { dx: 6, dy: 0 }, wheel: 0, pressed: () => false, held: () => false }, this.player);
+  }
+
+  // -------------------------------------------------------------------------
+  _detectQuality() {
+    const mobile = matchMedia('(pointer: coarse)').matches || /Mobi|Android/i.test(navigator.userAgent);
+    const smallScreen = Math.min(screen.width, screen.height) < 500;
+    return mobile || smallScreen ? 'low' : 'high';
+  }
+
+  _resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const pr = clamp(window.devicePixelRatio || 1, 1, this.quality === 'low' ? 1.6 : 2);
+    this.renderer.setPixelRatio(pr);
+    this.renderer.setSize(w, h);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.postfx?.setSize(w, h);
   }
 }

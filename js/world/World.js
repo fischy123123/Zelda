@@ -1,299 +1,327 @@
+// Populates the overworld: enemy camps, treasure chests, quest collectibles,
+// signposts, the Skywatch Ruins, the lake dock, and ambient night spawns.
+// The village and dungeon are their own modules; this covers everything else.
+
 import * as THREE from 'three';
-import { Terrain } from './Terrain.js?v=14';
-import { makeTree, makeRock, makeBush, makeRuin, makeFlowers, makeDungeonEntrance, makeCampfire } from './Props.js?v=14';
-import { Village } from './Village.js?v=14';
-import { Enemy } from '../entities/Enemy.js?v=14';
-import { Pickup } from '../entities/Pickup.js?v=14';
-import { Chest } from '../entities/Chest.js?v=14';
-import { SkyEnv } from '../gfx/SkyEnv.js?v=14';
-import { Grass } from '../gfx/Grass.js?v=14';
-import { Fireflies, Clouds } from '../gfx/Particles.js?v=14';
-import { waterNormal } from '../gfx/Textures.js?v=14';
+import { RNG } from '../util/rng.js';
+import { toonMaterial, PALETTE, addOutline } from '../gfx/Toon.js';
+import { SITES, LAKE, SPAWN, WORLD, regionAt } from './layout.js';
+import { Chest } from '../entities/Chest.js';
+import { Pickup } from '../entities/Pickup.js';
+import { createEnemy } from '../entities/Enemy.js';
 
-const DAY_LENGTH = 480; // seconds for a full day/night cycle
+const CAMPS = [
+  { site: SITES.camp1, enemies: ['boglin', 'boglin', 'boglin'] },
+  { site: SITES.camp2, enemies: ['boglin', 'boglin', 'skitter'] },
+  { site: SITES.camp3, enemies: ['boglin', 'boglin_brute'] },
+  { site: SITES.camp4, enemies: ['boglin', 'boglin', 'boglin_brute'] },
+  { site: SITES.camp5, enemies: ['boglin', 'skitter', 'skitter'] },
+];
 
-// The open overworld: dynamic sky with a day/night cycle, terrain, water, lush
-// grass, Hylia Village with NPCs, moblin camps, named regions, props, enemies,
-// pickups, chests, and the vault entrance.
 export class World {
-  constructor(renderer, quality = {}) {
-    this.name = 'overworld';
-    this.quality = {
-      grass: 16000, shadowMap: 4096, propScale: 1, fireflies: 200, lights: true, ...quality,
-    };
-    this.terrain = new Terrain({ size: 400, segments: 320, maxHeight: 22, seed: 7 });
-    this.group = new THREE.Group();
-    this.enemies = [];
-    this.pickups = [];
-    this.chests = [];
-    this.colliders = [];
-    this.interactables = [];
-    this.swayables = [];
-    this.flickers = [];
+  constructor(game) {
+    this.game = game;
+    this.rng = new RNG(WORLD.seed).fork('world');
+    this._wisps = [];
+    this._campState = CAMPS.map(() => ({ cleared: false, clearedDay: 0, spawned: false }));
+    this._lastRegion = null;
+    this._regionTimer = 0;
 
-    // ---- Sky, light, environment (dynamic day/night) ----
-    this.sky = new SkyEnv(renderer, { shadowMapSize: this.quality.shadowMap });
-    this.environment = this.sky.environment;
-    this.background = this.sky.fogColor.clone();
-    this.fog = new THREE.FogExp2(this.sky.fogColor.getHex(), 0.0026);
-    this.group.add(this.sky.mesh, this.sky.sun, this.sky.sun.target, this.sky.hemi, this.sky.fill);
-    this.dayTime = 0.3; // mid-morning start
-    this.dayFactor = 1;
-
-    this.spawn = new THREE.Vector3(0, this.terrain.getHeightAt(0, 0), 0);
-
-    // Named regions (checked in order; falls through to a quadrant name).
-    this.regions = [
-      { name: 'Hylia Village', x: 0, z: 0, r: 24 },
-      { name: 'The Sunken Vault', x: 48, z: -34, r: 15 },
-      { name: 'Verdant Meadow', x: 0, z: 0, r: 78 },
-    ];
-
-    this.group.add(this.terrain.mesh);
-    this._buildWater();
-    this._buildGrass();
-    this._buildVillage();
-    this._scatterProps();
-    this._buildClouds();
-    this._buildFireflies();
-    this._buildDungeonEntrance();
-    this._spawnEnemies();
+    this._buildRuins();
+    this._buildDock();
+    this._buildSignposts();
+    this._placeChests();
+    this._placeGlowshrooms();
     this._spawnCamps();
-    this._spawnLoot();
   }
 
-  get isNight() { return this.dayFactor < 0.4; }
+  // -------------------------------------------------------------------------
+  update(dt) {
+    const g = this.game;
+    this._regionCheck(dt);
+    this._nightWisps();
+    this._campRespawn();
 
-  regionAt(p) {
-    for (const r of this.regions) {
-      const dx = p.x - r.x, dz = p.z - r.z;
-      if (dx * dx + dz * dz < r.r * r.r) return r.name;
-    }
-    if (Math.abs(p.x) > Math.abs(p.z)) return p.x > 0 ? 'Emberpeak Foothills' : 'Westwood Thicket';
-    return p.z > 0 ? 'Sunmere Shores' : 'Northwind Steppe';
-  }
-
-  _buildWater() {
-    const geo = new THREE.PlaneGeometry(this.terrain.size, this.terrain.size, 96, 96);
-    geo.rotateX(-Math.PI / 2);
-    const wnorm = waterNormal();
-    wnorm.repeat.set(14, 14);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x2b86c5,
-      transparent: true,
-      opacity: 0.82,
-      roughness: 0.12,
-      metalness: 0.0,
-      envMapIntensity: 1.2,
-      normalMap: wnorm,
-      normalScale: new THREE.Vector2(0.35, 0.35),
-    });
-    this.waterNormalTex = wnorm;
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = { value: 0 };
-      mat.userData.shader = shader;
-      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        /* glsl */`
-        #include <begin_vertex>
-        float w = sin(position.x * 0.25 + uTime * 1.3)
-                + sin(position.z * 0.32 + uTime * 1.7) * 0.7
-                + sin((position.x + position.z) * 0.15 + uTime) * 0.5;
-        transformed.y += w * 0.18;
-        `
-      );
-    };
-    this.water = new THREE.Mesh(geo, mat);
-    this.water.position.y = this.terrain.seaLevel;
-    this.water.receiveShadow = true;
-    this.group.add(this.water);
-  }
-
-  _buildGrass() {
-    this.grass = new Grass(this.terrain, { count: this.quality.grass, radius: 135 });
-    this.group.add(this.grass.mesh);
-  }
-
-  _buildVillage() {
-    this.village = new Village(this.terrain, { lights: this.quality.lights });
-    this.group.add(this.village.group);
-    this.colliders.push(...this.village.colliders);
-    this.interactables.push(...this.village.interactables);
-  }
-
-  _buildClouds() {
-    this.clouds = new Clouds({ count: 14 });
-    this.group.add(this.clouds.group);
-  }
-
-  _buildFireflies() {
-    this.fireflies = new Fireflies({ count: this.quality.fireflies, radius: 55 });
-    this.group.add(this.fireflies.points);
-  }
-
-  _validSpot(minR = 18, maxR = 185) {
-    for (let tries = 0; tries < 12; tries++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = minR + Math.random() * (maxR - minR);
-      const x = Math.cos(a) * r;
-      const z = Math.sin(a) * r;
-      if (!this.terrain.isUnderwater(x, z)) return { x, z };
-    }
-    return null;
-  }
-
-  _scatterProps() {
-    const propCount = Math.round(300 * this.quality.propScale);
-    for (let i = 0; i < propCount; i++) {
-      const spot = this._validSpot(20);
-      if (!spot) continue;
-      const h = this.terrain.getHeightAt(spot.x, spot.z);
-      let prop;
-      if (h > this.terrain.maxHeight * 0.72) prop = makeRock(spot.x, spot.z, this.terrain);
-      else {
-        const roll = Math.random();
-        if (roll < 0.55) prop = makeTree(spot.x, spot.z, this.terrain);
-        else if (roll < 0.78) prop = makeRock(spot.x, spot.z, this.terrain);
-        else prop = makeBush(spot.x, spot.z, this.terrain);
-      }
-      if (prop.userData.sway) this.swayables.push(prop.userData.sway);
-      this.group.add(prop);
-    }
-    for (let i = 0; i < 60; i++) {
-      const spot = this._validSpot(8, 120);
-      if (spot && this.terrain.getHeightAt(spot.x, spot.z) < this.terrain.maxHeight * 0.45) {
-        this.group.add(makeFlowers(spot.x, spot.z, this.terrain));
-      }
-    }
-    for (let i = 0; i < 5; i++) {
-      const spot = this._validSpot(30, 160);
-      if (spot) this.group.add(makeRuin(spot.x, spot.z, this.terrain));
+    // Soft world boundary: keep the player inside the rim.
+    const p = g.player.position;
+    const d = Math.hypot(p.x, p.z);
+    const maxR = WORLD.playRadius + 130;
+    if (d > maxR) {
+      p.x *= maxR / d; p.z *= maxR / d;
     }
   }
 
-  _buildDungeonEntrance() {
-    let x = 48, z = -34;
-    if (this.terrain.isUnderwater(x, z)) { x = 30; z = 30; }
-    this.entrancePos = new THREE.Vector3(x, this.terrain.getHeightAt(x, z), z);
-    this.entrance = makeDungeonEntrance(x, z, this.terrain);
-    this.group.add(this.entrance);
-
-    this.interactables.push({
-      position: this.entrancePos,
-      range: 4.5,
-      getPrompt: () => '[E] Enter the Sunken Vault',
-      interact: (game) => game.enterDungeon(),
-    });
-  }
-
-  _spawnEnemies() {
-    for (let i = 0; i < 12; i++) {
-      const spot = this._validSpot(30, 170);
-      if (!spot) continue;
-      const kind = Math.random() < 0.65 ? 'chu' : 'moblin';
-      const e = new Enemy(kind, spot.x, spot.z, this.terrain);
-      this.enemies.push(e);
-      this.group.add(e.mesh);
+  _regionCheck(dt) {
+    this._regionTimer -= dt;
+    if (this._regionTimer > 0) return;
+    this._regionTimer = 0.8;
+    const g = this.game;
+    const r = regionAt(g.player.position.x, g.player.position.z);
+    if (r !== this._lastRegion) {
+      this._lastRegion = r;
+      g.events.emit('region:enter', { name: r });
     }
   }
 
+  // --- enemy camps ----------------------------------------------------------
   _spawnCamps() {
-    // Moblin camps around fires — little combat set-pieces to stumble into.
-    const spots = [[62, 42], [-72, -48], [-42, 84]];
-    for (const [cx, cz] of spots) {
-      if (this.terrain.isUnderwater(cx, cz)) continue;
-      const fire = makeCampfire(cx, cz, this.terrain, { light: this.quality.lights });
-      this.group.add(fire);
-      this.flickers.push({ flame: fire.userData.flame, light: fire.userData.light, phase: Math.random() * 6 });
-      for (let i = 0; i < 2; i++) {
-        const e = new Enemy('moblin', cx + 2.5 + i * 2, cz + (i ? 2.5 : -2.5), this.terrain);
-        this.enemies.push(e);
-        this.group.add(e.mesh);
+    const g = this.game;
+    for (let i = 0; i < CAMPS.length; i++) {
+      const camp = CAMPS[i];
+      const st = this._campState[i];
+      if (st.spawned) continue;
+      st.spawned = true;
+      const rng = this.rng.fork(`camp${i}`);
+      this._campProps(camp.site, rng);
+      for (const type of camp.enemies) {
+        const a = rng.angle(), r = rng.range(2, camp.site.r * 0.55);
+        const x = camp.site.x + Math.sin(a) * r;
+        const z = camp.site.z + Math.cos(a) * r;
+        const e = createEnemy(g, type, new THREE.Vector3(x, g.terrain.heightAt(x, z), z), {
+          anchor: { x: camp.site.x, z: camp.site.z, r: camp.site.r },
+          campIndex: i,
+        });
+        g.enemies.push(e);
       }
     }
   }
 
-  _spawnLoot() {
-    for (let i = 0; i < 16; i++) {
-      const spot = this._validSpot(14, 170);
-      if (!spot) continue;
-      const y = this.terrain.getHeightAt(spot.x, spot.z) + 0.6;
-      const roll = Math.random();
-      const color = roll < 0.7 ? 'green' : roll < 0.95 ? 'blue' : 'red';
-      const value = color === 'green' ? 1 : color === 'blue' ? 5 : 20;
-      const p = new Pickup('rupee', spot.x, y, spot.z, { color, value });
-      this.pickups.push(p);
-      this.group.add(p.mesh);
+  _campProps(site, rng) {
+    const g = this.game;
+    const group = new THREE.Group();
+    // Crude boglin tents: leaning hide cones + a totem.
+    const hide = toonMaterial({ color: 0x8a6248 });
+    const pole = toonMaterial({ color: PALETTE.woodDark });
+    for (let i = 0; i < 2; i++) {
+      const a = rng.angle();
+      const x = site.x + Math.sin(a) * site.r * 0.42;
+      const z = site.z + Math.cos(a) * site.r * 0.42;
+      const y = g.terrain.heightAt(x, z);
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.9, 2.6, 7, 1, true), hide);
+      tent.position.set(x, y + 1.25, z);
+      tent.rotation.y = rng.angle();
+      tent.castShadow = true;
+      group.add(tent);
+      g.colliders.add({ x, z, r: 1.7 });
     }
+    const tx = site.x, tz = site.z;
+    const ty = g.terrain.heightAt(tx, tz);
+    const totem = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 3.2, 7), pole);
+    totem.position.set(tx, ty + 1.6, tz);
+    totem.castShadow = true;
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 7), toonMaterial({ color: 0xd8d2c0 }));
+    skull.position.set(tx, ty + 3.5, tz);
+    group.add(totem, skull);
+    g.colliders.add({ x: tx, z: tz, r: 0.55 });
+    // Fire pit ring.
+    const ringMat = toonMaterial({ color: PALETTE.stoneDark });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const rx = tx + Math.sin(a) * 1.1 + 2.5, rz = tz + Math.cos(a) * 1.1 + 1.5;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25, 0), ringMat);
+      rock.position.set(rx, g.terrain.heightAt(rx, rz) + 0.15, rz);
+      group.add(rock);
+    }
+    g.scene.add(group);
+  }
 
-    const chestDefs = [
-      { dx: -26, dz: 20, reward: { itemId: 'shield', count: 1 } },
-      { dx: 22, dz: 42, reward: { itemId: 'bow', count: 1 } },
-      { dx: -42, dz: -22, reward: { itemId: 'bomb', count: 5 } },
-    ];
-    chestDefs.forEach((c, i) => {
-      let { dx, dz } = c;
-      if (this.terrain.isUnderwater(dx, dz)) { dx *= 0.4; dz *= 0.4; }
-      const chest = new Chest(`ow-chest-${i}`, dx, dz, this.terrain, c.reward);
-      this.chests.push(chest);
-      this.group.add(chest.group);
-      this.interactables.push({
-        position: chest.group.position,
-        range: 2.6,
-        getPrompt: () => (chest.opened ? null : '[E] Open chest'),
-        interact: (game) => game.openChest(chest),
-      });
+  _campRespawn() {
+    // When a camp is cleared, it repopulates after the next dawn if the player is far away.
+    const g = this.game;
+    for (let i = 0; i < CAMPS.length; i++) {
+      const st = this._campState[i];
+      const camp = CAMPS[i];
+      const alive = g.enemies.some((e) => e.campIndex === i && e.alive);
+      if (!alive && !st.cleared) { st.cleared = true; st.clearedDay = g.state.day; }
+      if (st.cleared && g.state.day > st.clearedDay) {
+        const d = Math.hypot(g.player.position.x - camp.site.x, g.player.position.z - camp.site.z);
+        if (d > 140) {
+          st.cleared = false; st.spawned = false;
+          this._spawnCamps();
+        }
+      }
+    }
+  }
+
+  // --- ambient night wisps --------------------------------------------------
+  _nightWisps() {
+    const g = this.game;
+    if (!g.sky) return;
+    const night = g.sky.isNight;
+    this._wisps = this._wisps.filter((w) => w.alive);
+    if (night && this._wisps.length < 3 && !g.inDungeon) {
+      const p = g.player.position;
+      // Not near the village — it's a safe haven.
+      const dv = Math.hypot(p.x - SITES.village.x, p.z - SITES.village.z);
+      if (dv > SITES.village.r + 40) {
+        const a = this.rng.angle();
+        const r = 28 + this.rng.next() * 20;
+        const x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r;
+        if (g.terrain.heightAt(x, z) > 1) {
+          const w = createEnemy(g, 'wisp', new THREE.Vector3(x, g.terrain.heightAt(x, z) + 2, z), { ephemeral: true });
+          g.enemies.push(w);
+          this._wisps.push(w);
+        }
+      }
+    }
+    if (!night) {
+      for (const w of this._wisps) if (w.alive && w.banish) w.banish();
+    }
+  }
+
+  // --- landmarks ------------------------------------------------------------
+  _buildRuins() {
+    const g = this.game;
+    const site = SITES.ruins;
+    const rng = this.rng.fork('ruins');
+    const stoneMat = toonMaterial({ color: PALETTE.stone });
+    const mossMat = toonMaterial({ color: 0x7a9a6a });
+    const group = new THREE.Group();
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const r = site.r * 0.62;
+      const x = site.x + Math.sin(a) * r;
+      const z = site.z + Math.cos(a) * r;
+      const y = g.terrain.heightAt(x, z);
+      const broken = rng.chance(0.3);
+      const h = broken ? rng.range(1.5, 3) : rng.range(5.5, 7.5);
+      const stone = new THREE.Mesh(new THREE.BoxGeometry(1.6, h, 1.1), rng.chance(0.4) ? mossMat : stoneMat);
+      stone.position.set(x, y + h / 2 - 0.2, z);
+      stone.rotation.y = a + rng.range(-0.2, 0.2);
+      stone.rotation.z = rng.range(-0.06, 0.06);
+      stone.castShadow = true;
+      group.add(stone);
+      g.colliders.add({ x, z, r: 1.2 });
+      // Lintels across some pairs.
+      if (!broken && i % 2 === 0) {
+        const a2 = ((i + 1) / n) * Math.PI * 2;
+        const x2 = site.x + Math.sin(a2) * r, z2 = site.z + Math.cos(a2) * r;
+        const lin = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.9, 1.2), stoneMat);
+        lin.position.set((x + x2) / 2, y + h + 0.25, (z + z2) / 2);
+        lin.rotation.y = Math.atan2(x2 - x, z2 - z) + Math.PI / 2;
+        lin.castShadow = true;
+        group.add(lin);
+      }
+    }
+    // Central dais.
+    const dais = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.8, 0.8, 9), stoneMat);
+    const dy = g.terrain.heightAt(site.x, site.z);
+    dais.position.set(site.x, dy + 0.3, site.z);
+    dais.receiveShadow = true;
+    group.add(dais);
+    addOutline(group, 0.012);
+    g.scene.add(group);
+
+    g.interact.register({
+      position: new THREE.Vector3(site.x, dy + 1, site.z),
+      radius: 3.5,
+      prompt: 'Examine',
+      onInteract: () => {
+        g.events.emit('toast', { text: '"When the star fell, the sky wept fire. The blade drank the dawn and slept." ' });
+        g.events.emit('lore', { id: 'ruins' });
+      },
     });
   }
 
-  update(dt, elapsed) {
-    const focus = this._followTarget;
-
-    // ---- Day/night cycle drives the sky, fog, and lighting ----
-    this.dayTime = (this.dayTime + dt / DAY_LENGTH) % 1;
-    this.sky.setTime(this.dayTime);
-    this.dayFactor = this.sky.dayFactor;
-    this.fog.color.copy(this.sky.fogColor);
-    this.background.copy(this.sky.fogColor);
-    this.fog.density = 0.0026 + (1 - this.dayFactor) * 0.0016;
-    if (this.fireflies) {
-      this.fireflies.points.material.opacity = 0.12 + (1 - this.dayFactor) * 0.85;
+  _buildDock() {
+    const g = this.game;
+    const site = SITES.lakeDock;
+    const woodMat = toonMaterial({ color: PALETTE.wood });
+    const group = new THREE.Group();
+    // Planks marching toward the lake center.
+    const dirX = (LAKE.x - site.x), dirZ = (LAKE.z - site.z);
+    const len = Math.hypot(dirX, dirZ);
+    const ux = dirX / len, uz = dirZ / len;
+    const yaw = Math.atan2(ux, uz);
+    for (let i = 0; i < 7; i++) {
+      const px = site.x + ux * (i * 1.35 + 2);
+      const pz = site.z + uz * (i * 1.35 + 2);
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 1.25), woodMat);
+      plank.position.set(px, 1.05 + Math.sin(i * 2.4) * 0.02, pz);
+      plank.rotation.y = yaw;
+      plank.castShadow = true;
+      group.add(plank);
     }
-
-    // Portal shimmer.
-    if (this.entrance?.userData.portal) {
-      const p = this.entrance.userData.portal;
-      p.material.opacity = 0.4 + Math.sin(elapsed * 3) * 0.18;
-      p.rotation.z += dt * 0.5;
+    // Support posts.
+    for (let i = 0; i < 4; i++) {
+      const px = site.x + ux * (i * 3 + 2.4);
+      const pz = site.z + uz * (i * 3 + 2.4);
+      for (const side of [-1, 1]) {
+        const ox = Math.cos(yaw) * side * 1.1, oz = -Math.sin(yaw) * side * 1.1;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 2.6, 6), woodMat);
+        post.position.set(px + ox, 0.2, pz + oz);
+        group.add(post);
+      }
     }
-
-    // Animated water + grass + clouds + fireflies + villagers + fires.
-    if (this.water?.material.userData.shader) {
-      this.water.material.userData.shader.uniforms.uTime.value = elapsed;
-    }
-    if (this.waterNormalTex) {
-      this.waterNormalTex.offset.x = elapsed * 0.03;
-      this.waterNormalTex.offset.y = elapsed * 0.02;
-    }
-    this.grass?.update(elapsed);
-    this.clouds?.update(dt);
-    this.fireflies?.update(elapsed, focus);
-    this.village?.update(dt, elapsed);
-    for (const f of this.flickers) {
-      const k = 1 + Math.sin(elapsed * 12 + f.phase) * 0.2;
-      f.flame.scale.set(k, k, k);
-      if (f.light) f.light.intensity = 3 + Math.sin(elapsed * 14 + f.phase) * 1.1;
-    }
-
-    for (const s of this.swayables) {
-      s.crown.rotation.x = Math.sin(elapsed * 1.2 + s.phase) * s.amp;
-      s.crown.rotation.z = Math.cos(elapsed * 0.9 + s.phase) * s.amp;
-    }
-
-    if (focus) this.sky.follow(focus);
-    for (const c of this.chests) c.update(dt);
+    g.scene.add(group);
   }
 
-  setShadowFocus(pos) { this._followTarget = pos; }
+  _buildSignposts() {
+    const g = this.game;
+    const signs = [
+      { x: SPAWN.x + 8, z: SPAWN.z + 14, text: 'North: Brindlemere Village — safe beds, warm stew.\nFar north: the Elderwood. Travellers vanish there.' },
+      { x: SITES.shrine.x + 30, z: SITES.shrine.z + 44, text: 'THE HOLLOW SHRINE\nSealed since the star fell. Turn back.' },
+      { x: -160, z: 60, text: 'West: Mirrowmere.\nThe water is lovely. The deep water is not.' },
+      { x: 250, z: 240, text: 'South-east: Cinder Flats.\nBring water. Trust nothing that skitters.' },
+    ];
+    const postMat = toonMaterial({ color: PALETTE.woodDark });
+    const boardMat = toonMaterial({ color: PALETTE.wood });
+    for (const s of signs) {
+      const y = g.terrain.heightAt(s.x, s.z);
+      const grp = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.7, 6), postMat);
+      post.position.set(s.x, y + 0.85, s.z);
+      const board = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 0.09), boardMat);
+      board.position.set(s.x, y + 1.5, s.z);
+      board.rotation.y = Math.atan2(SPAWN.x - s.x, SPAWN.z - s.z);
+      board.castShadow = true;
+      grp.add(post, board);
+      addOutline(grp, 0.02);
+      g.scene.add(grp);
+      g.colliders.add({ x: s.x, z: s.z, r: 0.3 });
+      g.interact.register({
+        position: new THREE.Vector3(s.x, y + 1, s.z),
+        radius: 2.6,
+        prompt: 'Read',
+        onInteract: () => g.events.emit('sign:read', { text: s.text }),
+      });
+    }
+  }
+
+  // --- treasure -------------------------------------------------------------
+  _placeChests() {
+    const g = this.game;
+    const spots = [
+      { id: 'ruins', x: SITES.ruins.x, z: SITES.ruins.z, loot: { gems: 40, item: 'potion' } },
+      { id: 'lake', x: LAKE.x + LAKE.r * 0.86, z: LAKE.z - LAKE.r * 0.5, loot: { gems: 25 } },
+      { id: 'forest1', x: -60, z: -430, loot: { gems: 20, hearts: 1 } },
+      { id: 'badland', x: 400, z: 330, loot: { gems: 60 } },
+      { id: 'camp3', x: SITES.camp3.x + 6, z: SITES.camp3.z + 4, loot: { gems: 30 } },
+      { id: 'hill-east', x: 560, z: -80, loot: { gems: 25, item: 'potion' } },
+    ];
+    this.chests = spots.map((sp) => {
+      const y = g.terrain.heightAt(sp.x, sp.z);
+      return new Chest(g, sp.id, new THREE.Vector3(sp.x, y, sp.z), this.rng.angle(), sp.loot);
+    });
+  }
+
+  _placeGlowshrooms() {
+    const g = this.game;
+    const rng = this.rng.fork('shrooms');
+    let placed = 0, tries = 0;
+    while (placed < 10 && tries++ < 400) {
+      const x = rng.range(-560, 560);
+      const z = rng.range(-660, -270);
+      const b = g.terrain.biomeAt(x, z);
+      if (b.forest < 0.4 || b.slope > 0.5) continue;
+      const y = g.terrain.heightAt(x, z) + 0.15;
+      g.pickups.push(new Pickup(g, 'glowshroom', new THREE.Vector3(x, y, z)));
+      placed++;
+    }
+  }
+
+  updateChests(dt) {
+    if (this.chests) for (const c of this.chests) c.update(dt);
+  }
 }
