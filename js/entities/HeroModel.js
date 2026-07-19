@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { toonMaterial, addOutline, PALETTE } from '../gfx/Toon.js';
-import { clamp01, lerp, damp, ease } from '../util/math.js';
+import { clamp01, lerp, damp, ease, TAU } from '../util/math.js';
 
 const _tip = new THREE.Vector3();
 
@@ -394,14 +394,26 @@ export class HeroModel {
     }
 
     // --- roll ----------------------------------------------------------------
+    // Forward somersault about the body's center (not the feet): rotate the
+    // root and offset its position so the pivot sits ROLL_PIVOT up.
     if (pose.roll) {
       const rt = clamp01(pose.roll.t);
-      P.rootRotX = ease.inOutQuad(rt) * Math.PI * 2;
-      P.hipsY = -0.28 * Math.sin(rt * Math.PI);
-      P.kneeL = 1.6; P.kneeR = 1.6; P.legL = 0.9; P.legR = 0.9;
-      P.armL = [0.8, 0, 0.4]; P.armR = [0.8, 0, -0.4];
-      P.elbL = -1.4; P.elbR = -1.4;
-      P.headRotX = 0.4;
+      P.rootRotX = ease.inOutQuad(rt) * TAU;
+      // Tight tuck: thighs to chest, shins folded, arms wrapped, chin down.
+      P.legL = 1.5; P.legR = 1.5; P.kneeL = 2.0; P.kneeR = 2.0;
+      P.armL = [1.4, 0, 0.5]; P.armR = [1.4, 0, -0.5];
+      P.elbL = -2.0; P.elbR = -2.0;
+      P.headRotX = 0.65;
+      P.torsoRotX = 0.5;
+      P.hipsY = -0.12;
+      this._wasRolling = true;
+    } else if (this._wasRolling) {
+      // Unwind cleanly: 2π ≡ 0 — never damp backwards through a full flip.
+      this._wasRolling = false;
+      let rx = this.root.rotation.x % TAU;
+      if (rx > Math.PI) rx -= TAU;
+      if (rx < -Math.PI) rx += TAU;
+      this.root.rotation.x = rx;
     }
 
     // --- hurt ----------------------------------------------------------------
@@ -439,7 +451,18 @@ export class HeroModel {
     dr(this.root, 'x', P.rootRotX);
     // Roll/spin rotations wrap; snap-assign to avoid long-way lerps.
     this.root.rotation.y = pose.attack?.index === 'spin' ? P.rootRotY : damp(this.root.rotation.y, P.rootRotY, k, dt);
-    if (pose.roll) this.root.rotation.x = P.rootRotX;
+    if (pose.roll) {
+      // Somersault about a pivot ROLL_PIVOT above the feet: equivalent to
+      // T(pivot) · R · T(-pivot) — rotation plus a compensating offset.
+      const h = 0.62;
+      const ang = P.rootRotX;
+      this.root.rotation.x = ang;
+      this.root.position.y = h * (1 - Math.cos(ang));
+      this.root.position.z = -h * Math.sin(ang);
+    } else {
+      this.root.position.y = damp(this.root.position.y, 0, 20, dt);
+      this.root.position.z = damp(this.root.position.z, 0, 20, dt);
+    }
     dr(this.root, 'z', P.rootRotZ);
     dr(this.torso, 'x', P.torsoRotX);
     dr(this.torso, 'y', P.torsoRotY);
