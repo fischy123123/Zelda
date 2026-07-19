@@ -13,8 +13,8 @@ const _sunWorld = new THREE.Vector3();
 // t: 0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset.
 const KEYS = [
   //  t     zenith    horizon   sunCol   sunI  hemiSky  hemiGnd  hemiI  fogCol   fogNear fogFar
-  { t: 0.00, ze: 0x0d1430, ho: 0x1c2848, su: 0xa8bce4, si: 0.4, hs: 0x38466e, hg: 0x1e2433, hi: 0.62, fo: 0x161e38, fn: 70, ff: 560 },
-  { t: 0.21, ze: 0x101836, ho: 0x2a3452, su: 0xb0c0e0, si: 0.38, hs: 0x404e74, hg: 0x232837, hi: 0.62, fo: 0x1d2540, fn: 70, ff: 600 },
+  { t: 0.00, ze: 0x1a2650, ho: 0x364670, su: 0xc4d6f6, si: 0.95, hs: 0x6478b0, hg: 0x3c4660, hi: 1.35, fo: 0x2e3a5e, fn: 85, ff: 680 },
+  { t: 0.21, ze: 0x1e2a54, ho: 0x424f74, su: 0xc4d0f2, si: 0.9, hs: 0x687cb2, hg: 0x404862, hi: 1.32, fo: 0x333f62, fn: 85, ff: 700 },
   { t: 0.25, ze: 0x35507e, ho: 0xffab66, su: 0xffb066, si: 1.0, hs: 0x8a9ac0, hg: 0x6a5c4c, hi: 0.72, fo: 0xe8b48c, fn: 80, ff: 720 },
   { t: 0.30, ze: 0x4a7cc0, ho: 0xffd9a0, su: 0xffd9a8, si: 1.25, hs: 0xa5bcda, hg: 0x7d7c62, hi: 0.8, fo: 0xead8b8, fn: 100, ff: 880 },
   { t: 0.40, ze: 0x4f8fdc, ho: 0xcfe6f4, su: 0xfff2d0, si: 1.4, hs: 0xbdd4ec, hg: 0x8a9268, hi: 0.88, fo: 0xd6e6ee, fn: 120, ff: 1020 },
@@ -22,9 +22,9 @@ const KEYS = [
   { t: 0.60, ze: 0x4a86cf, ho: 0xc8ddec, su: 0xffedc2, si: 1.38, hs: 0xb8d0e8, hg: 0x899066, hi: 0.86, fo: 0xd4e0e8, fn: 120, ff: 1000 },
   { t: 0.70, ze: 0x3d5f9e, ho: 0xffc07a, su: 0xffc784, si: 1.15, hs: 0x9aa6c8, hg: 0x7a6e56, hi: 0.78, fo: 0xecc79a, fn: 100, ff: 850 },
   { t: 0.75, ze: 0x2c3a6a, ho: 0xff8f56, su: 0xff9558, si: 0.85, hs: 0x707a9e, hg: 0x5c5044, hi: 0.72, fo: 0xdd9a74, fn: 85, ff: 720 },
-  { t: 0.80, ze: 0x1a2448, ho: 0x5c4878, su: 0xc9a0b4, si: 0.5, hs: 0x4a527a, hg: 0x2e2a30, hi: 0.66, fo: 0x363656, fn: 75, ff: 620 },
-  { t: 0.85, ze: 0x0f1734, ho: 0x222c4c, su: 0xa8bce4, si: 0.42, hs: 0x3c4a72, hg: 0x202532, hi: 0.62, fo: 0x1a2240, fn: 70, ff: 570 },
-  { t: 1.00, ze: 0x0d1430, ho: 0x1c2848, su: 0xa8bce4, si: 0.4, hs: 0x38466e, hg: 0x1e2433, hi: 0.62, fo: 0x161e38, fn: 70, ff: 560 },
+  { t: 0.80, ze: 0x1e2850, ho: 0x64528a, su: 0xc9a8c4, si: 0.65, hs: 0x585e92, hg: 0x38333e, hi: 0.9, fo: 0x3c3c62, fn: 80, ff: 660 },
+  { t: 0.85, ze: 0x1c284e, ho: 0x3a486a, su: 0xc4d6f6, si: 0.92, hs: 0x6276ac, hg: 0x3a445e, hi: 1.3, fo: 0x303c60, fn: 85, ff: 680 },
+  { t: 1.00, ze: 0x1a2650, ho: 0x364670, su: 0xc4d6f6, si: 0.95, hs: 0x6478b0, hg: 0x3c4660, hi: 1.35, fo: 0x2e3a5e, fn: 85, ff: 680 },
 ];
 // Pre-parse hex → Color once.
 for (const k of KEYS) {
@@ -274,7 +274,7 @@ export class Sky {
     const night = this.isNight ? 1 : 0;
     const nightBlend = smoothstep(0.78, 0.83, t) + (1 - smoothstep(0.2, 0.25, t));
     u.uStarAlpha.value = clamp01(nightBlend);
-    u.uCloudLight.value = lerp(1, 0.16, clamp01(nightBlend));
+    u.uCloudLight.value = lerp(1, 0.32, clamp01(nightBlend));
     // Dusk/dawn horizon glow strength.
     const dawn = 1 - clamp01(Math.abs(t - 0.25) / 0.07);
     const dusk = 1 - clamp01(Math.abs(t - 0.75) / 0.07);
