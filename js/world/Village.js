@@ -362,37 +362,53 @@ export class Village {
     const g = this.game;
     this.npcs = [
       new NPC(g, {
-        name: 'Elder Maren', dialogueId: 'maren',
+        name: 'Elder Maren', dialogueId: 'maren', variant: 'elder',
         pos: { x: 60, z: -58 }, speed: 1.1,
         waypoints: [{ x: 60, z: -58 }, { x: 52, z: -50 }, { x: 66, z: -48 }],
         colors: { robe: 0x8a5c78, trim: 0x5c3a52, hair: 0xd8d2c8 }, hat: 'hood',
+        quest: (gm) => {
+          const st = gm.quests.stage('shattered-star');
+          return st === 0 ? 'offer' : st === 1 ? 'progress' : st === 2 ? 'ready' : null;
+        },
       }),
       new NPC(g, {
-        name: 'Healer Nyla', dialogueId: 'nyla',
+        name: 'Healer Nyla', dialogueId: 'nyla', variant: 'healer',
         pos: { x: 26, z: -44 }, speed: 1.5,
         waypoints: [{ x: 26, z: -44 }, { x: 42, z: -32 }, { x: 54, z: -24 }],
         colors: { robe: 0x5c8a72, trim: 0x3a5c4a, hair: 0x8a4a2e }, apron: true,
+        quest: (gm) => {
+          const st = gm.quests.stage('mushroom-medicine');
+          if (st === 0) return 'offer';
+          if (st === 1) return gm.quests.canTurnInShrooms() ? 'ready' : 'progress';
+          return null;
+        },
       }),
       new NPC(g, {
-        name: 'Captain Bram', dialogueId: 'bram',
+        name: 'Captain Bram', dialogueId: 'bram', variant: 'guard',
         pos: { x: 92, z: 4 }, speed: 2,
         waypoints: [{ x: 92, z: 4 }, { x: 70, z: 16 }, { x: 44, z: 12 }, { x: 48, z: -18 }, { x: 84, z: -22 }],
-        colors: { robe: 0x6a6f7a, trim: 0x4a4e58, hair: 0x3c3228 }, hat: 'cap', scale: 1.12,
+        colors: { robe: 0x6a6f7a, trim: 0x4a4e58, hair: 0x3c3228 }, scale: 1.12,
+        quest: (gm) => {
+          const st = gm.quests.stage('thin-the-horde');
+          if (st === 0) return 'offer';
+          if (st === 1) return gm.quests.canTurnInHorde() ? 'ready' : 'progress';
+          return null;
+        },
       }),
       new NPC(g, {
-        name: 'Shopkeep Tam', dialogueId: 'tam',
+        name: 'Shopkeep Tam', dialogueId: 'tam', variant: 'merchant',
         pos: { x: 75, z: -10 }, speed: 1.2,
         waypoints: [{ x: 75, z: -10 }, { x: 77, z: -13 }],
         colors: { robe: 0xa8703e, trim: 0x6e4826, hair: 0x2c2018 }, apron: true,
       }),
       new NPC(g, {
-        name: 'Pip', dialogueId: 'pip',
+        name: 'Pip', dialogueId: 'pip', variant: 'kid',
         pos: { x: 56, z: -14 }, speed: 3,
         waypoints: [{ x: 56, z: -14 }, { x: 70, z: -24 }, { x: 62, z: -34 }, { x: 46, z: -26 }],
         colors: { robe: 0xc9784a, trim: 0x8a4e2e, hair: 0xd9a441 }, scale: 0.62,
       }),
       new NPC(g, {
-        name: 'Farmer Rho', dialogueId: 'rho',
+        name: 'Farmer Rho', dialogueId: 'rho', variant: 'farmer',
         pos: { x: 102, z: -40 }, speed: 1.3,
         waypoints: [{ x: 102, z: -40 }, { x: 112, z: -24 }, { x: 108, z: -8 }],
         colors: { robe: 0x7a8a52, trim: 0x565e3a, hair: 0x5c4632 }, hat: 'straw',

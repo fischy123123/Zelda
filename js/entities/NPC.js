@@ -1,16 +1,53 @@
-// Villagers: shared procedural body rig with per-person variety, waypoint
-// wandering, idle gestures, and dialogue hookup.
+// Villagers: shared procedural body rig with strong per-person silhouettes
+// (staff, armor, pitchfork, beard…), waypoint wandering, idle gestures,
+// dialogue hookup, and floating quest markers (! offer, ? turn-in).
 
 import * as THREE from 'three';
 import { toonMaterial, addOutline } from '../gfx/Toon.js';
 import { clamp01, damp, dampAngle } from '../util/math.js';
 import { getDialogue } from '../data/dialogue.js';
 
+// ---------------------------------------------------------------------------
+// Overhead quest markers — three shared sprite materials built once.
+// ---------------------------------------------------------------------------
+let _markerMats = null;
+function markerMats() {
+  if (_markerMats) return _markerMats;
+  const make = (char, color, dim) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const x = c.getContext('2d');
+    x.font = '900 92px Georgia, "Times New Roman", serif';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.lineWidth = 16;
+    x.lineJoin = 'round';
+    x.strokeStyle = 'rgba(14, 10, 4, 0.92)';
+    x.strokeText(char, 64, 70);
+    x.fillStyle = color;
+    x.fillText(char, 64, 70);
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthWrite: false, toneMapped: false,
+      opacity: dim ? 0.8 : 1,
+    });
+    return mat;
+  };
+  _markerMats = {
+    offer: make('!', '#ffd24c'),        // gold ! — quest available
+    ready: make('?', '#ffd24c'),        // gold ? — ready to turn in
+    progress: make('?', '#aab2c2', 1),  // gray ? — in progress, come back later
+  };
+  return _markerMats;
+}
+
 export class NPC {
   /**
    * opts: {name, dialogueId, pos: {x,z}, waypoints: [{x,z}...], speed?,
    *        colors: {robe, trim?, skin?, hair?}, hat: 'none'|'straw'|'hood'|'cap',
-   *        apron?: bool, scale?: number}
+   *        apron?: bool, scale?: number,
+   *        variant?: 'elder'|'healer'|'guard'|'merchant'|'kid'|'farmer',
+   *        quest?: (game) => 'offer'|'progress'|'ready'|null}
    */
   constructor(game, opts) {
     this.game = game;
@@ -29,10 +66,22 @@ export class NPC {
     this._build(opts);
     game.scene.add(this.group);
 
+    // Quest marker sprite (only for quest-giving folk).
+    this.questKind = null;
+    if (opts.quest) {
+      this.marker = new THREE.Sprite(markerMats().offer);
+      this.marker.visible = false;
+      this._markerY = 1.55 * (opts.scale ?? 1) + 0.42;
+      this.marker.position.y = this._markerY;
+      this.marker.scale.setScalar(0.55);
+      this.group.add(this.marker);
+      this._questPoll = Math.random() * 0.4; // desync polls across NPCs
+    }
+
     game.interact.register({
       position: this.group.position,
       radius: 3,
-      prompt: 'Talk',
+      prompt: `Talk — ${opts.name}`,
       enabled: () => !game.inDungeon,
       onInteract: (g) => this._startTalk(g),
     });
@@ -53,6 +102,7 @@ export class NPC {
     const skin = toonMaterial({ color: c.skin ?? 0xeec39a, cache: false });
     const hairM = toonMaterial({ color: c.hair ?? 0x5c4632, cache: false });
     const s = opts.scale ?? 1;
+    const variant = opts.variant;
 
     this.body = new THREE.Group();
     this.group.add(this.body);
@@ -67,6 +117,11 @@ export class NPC {
     chest.scale.set(1, 0.8, 0.85);
     chest.castShadow = true;
     this.body.add(chest);
+    if (variant === 'merchant') {
+      // Prosperous roundness.
+      robeMesh.scale.set(1.3, 1, 1.18);
+      chest.scale.set(1.28, 0.8, 1.0);
+    }
     if (opts.apron) {
       const apron = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.04), trim);
       apron.position.set(0, 0.52, 0.28);
@@ -90,7 +145,8 @@ export class NPC {
       eye.userData.noOutline = true;
       this.head.add(eye);
     }
-    // Hair / hat.
+    // Hair / hat. Guards get a helmet and merchants go bald via their variant.
+    const bareHead = variant === 'guard' || variant === 'merchant';
     if (opts.hat === 'straw') {
       const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.32, 0.03, 12), toonMaterial({ color: 0xd9b970 }));
       brim.position.y = 0.13;
@@ -106,7 +162,7 @@ export class NPC {
       const cap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.45), hairM);
       cap.position.y = 0.08;
       this.head.add(cap);
-    } else {
+    } else if (!bareHead) {
       const hairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hairM);
       hairMesh.position.y = 0.045;
       this.head.add(hairMesh);
@@ -128,8 +184,112 @@ export class NPC {
       this.body.add(arm);
     }
 
+    // Distinct per-person features so folk read at a glance.
+    if (variant) this._buildVariant(variant, { robe, trim, skin, hairM });
+
     this.body.scale.setScalar(s);
     addOutline(this.group, 0.03);
+  }
+
+  // -------------------------------------------------------------------------
+  _buildVariant(variant, mats) {
+    const { trim, hairM } = mats;
+    const B = this.body, H = this.head;
+    const add = (parent, geo, mat, x, y, z) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.castShadow = true;
+      parent.add(m);
+      return m;
+    };
+
+    if (variant === 'elder') {
+      // Hunched, white-haired, leaning on a glowing star-staff.
+      B.rotation.x = 0.13;
+      const backHair = add(H, new THREE.SphereGeometry(0.1, 8, 7), hairM, 0, -0.07, -0.13);
+      backHair.scale.set(1.25, 1.9, 0.7);
+      const shawl = add(B, new THREE.SphereGeometry(0.2, 10, 8), trim, 0, 1.0, 0);
+      shawl.scale.set(1.55, 0.55, 1.35);
+      const wood = toonMaterial({ color: 0x5c422a });
+      const staff = new THREE.Group();
+      staff.position.set(0, -0.34, 0.07);
+      const pole = add(staff, new THREE.CylinderGeometry(0.028, 0.04, 1.24, 7), wood, 0, -0.05, 0);
+      void pole;
+      add(staff, new THREE.SphereGeometry(0.062, 8, 8),
+        toonMaterial({ color: 0xffd88a, emissive: 0xb87c1e, emissiveIntensity: 0.9 }), 0, 0.62, 0);
+      this.armR.add(staff);
+    } else if (variant === 'healer') {
+      // Bun, headband, herb satchel and a belt potion.
+      add(H, new THREE.SphereGeometry(0.085, 8, 7), hairM, 0, 0.21, -0.06);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.022, 6, 16), trim);
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.1;
+      H.add(band);
+      const strap = add(B, new THREE.BoxGeometry(0.07, 0.62, 0.03), trim, 0.02, 0.82, 0.22);
+      strap.rotation.z = 0.85;
+      const bag = add(B, new THREE.BoxGeometry(0.17, 0.15, 0.09), trim, -0.24, 0.55, 0.13);
+      bag.rotation.y = 0.35;
+      add(bag, new THREE.SphereGeometry(0.045, 7, 6),
+        toonMaterial({ color: 0xd9527a, emissive: 0x581a2e, emissiveIntensity: 0.6 }), 0.04, 0.1, 0);
+    } else if (variant === 'guard') {
+      // Steel cuirass, pauldrons, crested helmet, regulation mustache.
+      const steel = toonMaterial({ color: 0x8f96a3 });
+      const crest = toonMaterial({ color: 0xc9564c });
+      const cuirass = add(B, new THREE.SphereGeometry(0.26, 10, 8), steel, 0, 0.88, 0);
+      cuirass.scale.set(1.02, 0.82, 0.9);
+      for (const sd of [-1, 1]) {
+        const p = add(B, new THREE.SphereGeometry(0.1, 8, 7), steel, sd * 0.26, 1.0, 0);
+        p.scale.set(1.2, 0.65, 1.2);
+      }
+      const helm = add(H, new THREE.SphereGeometry(0.185, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), steel, 0, 0.055, 0);
+      helm.scale.set(1.04, 1.05, 1.04);
+      const plume = add(H, new THREE.BoxGeometry(0.045, 0.1, 0.3), crest, 0, 0.24, -0.02);
+      plume.rotation.x = -0.15;
+      add(H, new THREE.BoxGeometry(0.12, 0.032, 0.03), hairM, 0, -0.045, 0.155);
+      const scab = add(B, new THREE.BoxGeometry(0.06, 0.42, 0.04), toonMaterial({ color: 0x4a3826 }), -0.26, 0.42, 0.06);
+      scab.rotation.z = 0.14;
+      add(scab, new THREE.BoxGeometry(0.09, 0.05, 0.05), steel, 0, 0.24, 0);
+    } else if (variant === 'merchant') {
+      // Bald crown, grand beard, coin pouch, showman's sash.
+      for (const sd of [-1, 1]) {
+        const tuft = add(H, new THREE.SphereGeometry(0.06, 7, 6), hairM, sd * 0.14, 0.02, -0.06);
+        tuft.scale.set(0.8, 1, 1.3);
+      }
+      const beard = add(H, new THREE.SphereGeometry(0.11, 9, 8), hairM, 0, -0.1, 0.09);
+      beard.scale.set(1.25, 1.15, 0.75);
+      const sash = add(B, new THREE.BoxGeometry(0.1, 0.72, 0.04), toonMaterial({ color: 0xc9564c }), 0, 0.8, 0.24);
+      sash.rotation.z = 0.8;
+      const pouch = add(B, new THREE.SphereGeometry(0.095, 8, 7), toonMaterial({ color: 0x8a6a44 }), 0.3, 0.52, 0.14);
+      pouch.scale.set(1, 1.15, 1);
+      add(pouch, new THREE.CylinderGeometry(0.03, 0.045, 0.05, 6), toonMaterial({ color: 0xe8b64c }), 0, 0.11, 0);
+    } else if (variant === 'kid') {
+      // Oversized noggin, cowlick spikes, adventure backpack.
+      H.scale.setScalar(1.26);
+      for (const [sx, rz] of [[-0.07, 0.5], [0.02, -0.15], [0.09, -0.6]]) {
+        const spike = add(H, new THREE.ConeGeometry(0.045, 0.11, 6), hairM, sx, 0.2, -0.02);
+        spike.rotation.z = rz;
+        spike.rotation.x = -0.3;
+      }
+      const pack = add(B, new THREE.BoxGeometry(0.22, 0.24, 0.12), trim, 0, 0.82, -0.24);
+      pack.rotation.x = -0.08;
+      add(pack, new THREE.SphereGeometry(0.05, 6, 6), toonMaterial({ color: 0xd9b970 }), 0, 0.15, 0);
+    } else if (variant === 'farmer') {
+      // Neck kerchief and a well-used pitchfork over the shoulder.
+      const scarf = add(B, new THREE.SphereGeometry(0.1, 8, 7), toonMaterial({ color: 0xc9564c }), 0, 1.05, 0.05);
+      scarf.scale.set(1.45, 0.55, 1.2);
+      const wood = toonMaterial({ color: 0x8a6a44 });
+      const steel = toonMaterial({ color: 0xb8bcc4 });
+      const fork = new THREE.Group();
+      fork.position.set(0.24, 1.0, -0.14);
+      fork.rotation.z = -0.42;
+      fork.rotation.x = 0.12;
+      add(fork, new THREE.CylinderGeometry(0.025, 0.03, 1.5, 6), wood, 0, 0, 0);
+      add(fork, new THREE.BoxGeometry(0.2, 0.035, 0.03), steel, 0, 0.76, 0);
+      for (const tx of [-0.08, 0, 0.08]) {
+        add(fork, new THREE.CylinderGeometry(0.012, 0.006, 0.16, 5), steel, tx, 0.85, 0);
+      }
+      B.add(fork);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -168,6 +328,25 @@ export class NPC {
     }
 
     this.group.rotation.y = this.yaw;
+
+    // Quest marker: poll status at ~2.5Hz, bob gently while shown.
+    if (this.opts.quest) {
+      this._questPoll -= dt;
+      if (this._questPoll <= 0) {
+        this._questPoll = 0.4;
+        let kind = null;
+        try { kind = this.opts.quest(g) || null; } catch (e) { kind = null; }
+        if (kind !== this.questKind) {
+          this.questKind = kind;
+          this.marker.visible = !!kind;
+          if (kind) this.marker.material = markerMats()[kind];
+        }
+      }
+      if (this.marker.visible) {
+        this.marker.position.y = this._markerY + Math.sin(t * 2.6) * 0.07;
+        this.marker.scale.setScalar(this.questKind === 'progress' ? 0.42 : 0.58);
+      }
+    }
 
     // Walk waddle / idle sway / talk gestures.
     this._walk = damp(this._walk ?? 0, moving ? 1 : 0, 8, dt);

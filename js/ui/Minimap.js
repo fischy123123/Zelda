@@ -12,11 +12,12 @@ const BUILD_BUDGET_MS = 3.5;     // per-frame build time slice
 const ZOOM_RADIUS = 135;         // world units shown from center in zoom mode
 
 const MARKERS = [
-  { site: SITES.village, color: '#e8b64c', shape: 'circle' },
-  { site: SITES.shrine, color: '#7fd4ff', shape: 'diamond' },
-  { site: SITES.ruins, color: '#c9c4b6', shape: 'triangle' },
-  { site: SITES.lakeDock, color: '#4c9df0', shape: 'square' },
+  { site: SITES.village, color: '#e8b64c', shape: 'circle', label: 'Brindlemere' },
+  { site: SITES.shrine, color: '#7fd4ff', shape: 'diamond', label: 'Hollow Shrine' },
+  { site: SITES.ruins, color: '#c9c4b6', shape: 'triangle', label: 'Skywatch Ruins' },
+  { site: SITES.lakeDock, color: '#4c9df0', shape: 'square', label: 'Mirrowmere' },
 ];
+const CAMPS = [SITES.camp1, SITES.camp2, SITES.camp3, SITES.camp4, SITES.camp5];
 
 export class Minimap {
   constructor(game, ui) {
@@ -33,6 +34,9 @@ export class Minimap {
     this.canvas.width = px;
     this.canvas.height = px;
     el('div', 'mm-north', this.wrap, 'N');
+    el('div', 'mm-dir mm-e', this.wrap, 'E');
+    el('div', 'mm-dir mm-s', this.wrap, 'S');
+    el('div', 'mm-dir mm-w', this.wrap, 'W');
     this.ctx = this.canvas.getContext('2d');
 
     this.off = document.createElement('canvas');
@@ -123,8 +127,10 @@ export class Minimap {
   // -------------------------------------------------------------------------
   _pollQuest() {
     let target = null;
+    this._campsActive = false;
     try {
       const q = this.game.quests;
+      this._campsActive = !!q && q.stage('thin-the-horde') === 1;
       const o = q && typeof q.activeObjective === 'function' ? q.activeObjective() : null;
       if (o) {
         const s = `${o.title || ''} ${o.text || ''}`.toLowerCase();
@@ -210,16 +216,79 @@ export class Minimap {
       ctx.drawImage(this.off, sx, sy, srcHalf * 2, srcHalf * 2, c - R, c - R, R * 2, R * 2);
     }
 
-    // Site markers.
+    // Dashed guide line: player → active quest target (under the markers).
+    if (this._questTarget) {
+      const px0 = c + (p.x - viewX) * scale;
+      const py0 = c + (p.z - viewZ) * scale;
+      const qx0 = c + (this._questTarget.x - viewX) * scale;
+      const qy0 = c + (this._questTarget.z - viewZ) * scale;
+      ctx.save();
+      ctx.setLineDash([4, 5]);
+      ctx.lineDashOffset = -(performance.now() * 0.01) % 9;
+      ctx.beginPath();
+      ctx.moveTo(px0, py0);
+      ctx.lineTo(qx0, qy0);
+      ctx.strokeStyle = 'rgba(255, 217, 122, 0.55)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Site markers (+ name labels in whole-valley view).
     for (const m of MARKERS) {
       const mx = c + (m.site.x - viewX) * scale;
       const my = c + (m.site.z - viewZ) * scale;
       const dx = mx - c, dy = my - c;
       if (dx * dx + dy * dy > (R - 7) * (R - 7)) continue;
       this._marker(ctx, mx, my, m.color, m.shape);
+      if (!this._zoom) this._label(ctx, mx, my + 13, m.label);
     }
 
-    // Active quest marker — clamped to the rim, gently pulsing.
+    // Boglin camps while the horde hunt is on: red ✕ marks the prey.
+    if (this._campsActive) {
+      for (const camp of CAMPS) {
+        const mx = c + (camp.x - viewX) * scale;
+        const my = c + (camp.z - viewZ) * scale;
+        const dx = mx - c, dy = my - c;
+        if (dx * dx + dy * dy > (R - 7) * (R - 7)) continue;
+        this._cross(ctx, mx, my, 4, '#ff6a55');
+      }
+    }
+
+    // NPC quest markers in close-up view: gold ! / ? over the giver's dot.
+    if (this._zoom) {
+      const npcs = this.game.village && this.game.village.npcs;
+      if (npcs) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '900 11px Georgia, serif';
+        for (const npc of npcs) {
+          const nx = c + (npc.group.position.x - viewX) * scale;
+          const ny = c + (npc.group.position.z - viewZ) * scale;
+          const dx = nx - c, dy = ny - c;
+          if (dx * dx + dy * dy > (R - 8) * (R - 8)) continue;
+          ctx.beginPath();
+          ctx.arc(nx, ny, 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = '#f2ead6';
+          ctx.strokeStyle = 'rgba(10, 8, 4, 0.8)';
+          ctx.lineWidth = 1;
+          ctx.fill();
+          ctx.stroke();
+          if (npc.questKind) {
+            const ch = npc.questKind === 'offer' ? '!' : '?';
+            const col = npc.questKind === 'progress' ? '#aab2c2' : '#ffd24c';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(10, 8, 4, 0.85)';
+            ctx.strokeText(ch, nx, ny - 8);
+            ctx.fillStyle = col;
+            ctx.fillText(ch, nx, ny - 8);
+          }
+        }
+      }
+    }
+
+    // Active quest marker — clamped to the rim, gently pulsing, with the
+    // straight-line distance so you know how far the walk is.
     if (this._questTarget) {
       let qx = (this._questTarget.x - viewX) * scale;
       let qy = (this._questTarget.z - viewZ) * scale;
@@ -228,6 +297,11 @@ export class Minimap {
       if (d > lim) { qx = qx / d * lim; qy = qy / d * lim; }
       const pulse = 5.5 + Math.sin(performance.now() * 0.005) * 1.4;
       this._star(ctx, c + qx, c + qy, pulse, '#ffd97a');
+      const distW = Math.hypot(this._questTarget.x - p.x, this._questTarget.z - p.z);
+      if (distW > 18) {
+        const ly = qy + (qy < 0 ? 15 : -13); // keep the text inside the ring
+        this._label(ctx, c + qx, c + ly, `${Math.round(distW)}m`, '#ffe9b0');
+      }
     }
 
     // Camera view cone + player arrow.
@@ -287,6 +361,33 @@ export class Minimap {
     ctx.strokeStyle = 'rgba(10, 8, 4, 0.75)';
     ctx.lineWidth = 1.5;
     ctx.fill();
+    ctx.stroke();
+  }
+
+  _label(ctx, x, y, text, color = '#e8e1cd') {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 9px Georgia, serif';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(10, 8, 4, 0.85)';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  _cross(ctx, x, y, r, color) {
+    ctx.beginPath();
+    ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r);
+    ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r);
+    ctx.strokeStyle = 'rgba(10, 8, 4, 0.85)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r);
+    ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
     ctx.stroke();
   }
 

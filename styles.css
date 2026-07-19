@@ -512,6 +512,15 @@ body.touch-mode .prompt-chip { display: none; }
   color: var(--gold-bright);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
+.mm-dir {
+  position: absolute;
+  font: 700 10px/1.4 var(--serif);
+  color: rgba(232, 225, 205, 0.7);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.mm-e { right: -1px; top: 50%; transform: translateY(-50%); }
+.mm-s { bottom: -4px; left: 50%; transform: translateX(-50%); }
+.mm-w { left: -1px; top: 50%; transform: translateY(-50%); }
 body.touch-mode .minimap {
   left: calc(12px + var(--sal));
   top: calc(112px + var(--sat));

@@ -757,6 +757,21 @@ export class AudioEngine {
     }
   }
 
+  // Footstep: a soft filtered tap, voiced per biome (thud on grass, crunch on
+  // sand, knock on rock). Named _stepSfx — this._step is the sequencer counter.
+  _stepSfx(t, o = {}) {
+    const b = o.biome || 'grass';
+    const m = o.sprint ? 1.35 : 1;
+    if (b === 'beach' || b === 'badland') {
+      this._burst(t, 0.07, { type: 'bandpass', f0: 2400, f1: 900, q: 0.8, gain: 0.05 * m, attack: 0.002 });
+    } else if (b === 'rock' || b === 'cliff' || b === 'dungeon') {
+      this._burst(t, 0.05, { type: 'lowpass', f0: 900, gain: 0.06 * m, attack: 0.001 });
+      this._tone(t, 0.04, { type: 'sine', f0: 190, f1: 120, gain: 0.05 * m });
+    } else {
+      this._burst(t, 0.06, { type: 'lowpass', f0: 520, gain: 0.055 * m, attack: 0.003 });
+    }
+  }
+
   // -- SFX definitions -------------------------------------------------------
   _playSfx(name, t, o) {
     switch (name) {
@@ -834,7 +849,7 @@ export class AudioEngine {
       case 'secret':
         this._fanfare(t, 523.25, [[0, 0, 0.12], [0.13, 5, 0.12], [0.26, 7, 0.12], [0.39, 12, 0.85]]);
         break;
-      case 'step': this._step(t, o); break;
+      case 'step': this._stepSfx(t, o); break;
       case 'jump':
         this._burst(t, 0.17, { type: 'bandpass', f0: 480, f1: 1150, q: 1, gain: 0.08, attack: 0.02 });
         break;

@@ -42,13 +42,16 @@ export class HeroModel {
     this._drawTimer = 0;      // sword drawn while > 0
     this._blinkT = 0;
 
-    const tunic = toonMaterial({ color: PALETTE.heroTunic });
-    const tunicDark = toonMaterial({ color: 0x1f6650 });
+    const tunic = toonMaterial({ color: 0x1f7a58 });        // deep emerald
+    const tunicDark = toonMaterial({ color: 0x14503a });
+    const underCloth = toonMaterial({ color: 0x2e3440 });   // charcoal underlayer
     const skin = toonMaterial({ color: PALETTE.heroSkin });
     const hair = toonMaterial({ color: PALETTE.heroHair });
-    const leather = toonMaterial({ color: 0x6b4a2e });
-    const boots = toonMaterial({ color: 0x53381f });
-    const capMat = toonMaterial({ color: 0x256b52 });
+    const leather = toonMaterial({ color: 0x53381f });
+    const leatherDark = toonMaterial({ color: 0x33241a });
+    const boots = toonMaterial({ color: 0x2a1d12 });
+    const steel = toonMaterial({ color: 0x9aa4b2 });
+    const capeMat = toonMaterial({ color: 0x7c2b33 });      // battle-worn crimson
 
     // --- body rig ------------------------------------------------------------
     // root → hips → torso → (head, arms), legs hang from hips.
@@ -60,6 +63,14 @@ export class HeroModel {
     chest.geometry.translate(0, 0, 0);
     box(this.torso, 0.47, 0.12, 0.29, leather, 0, 0.05, 0);       // belt
     box(this.torso, 0.1, 0.14, 0.02, toonMaterial({ color: PALETTE.gold }), 0, 0.05, 0.15); // buckle
+    // Baldric strap across the chest with a gold stud.
+    const strapF = box(this.torso, 0.09, 0.5, 0.03, leatherDark, 0, 0.28, 0.145);
+    strapF.rotation.z = 0.7;
+    box(this.torso, 0.06, 0.06, 0.05, toonMaterial({ color: PALETTE.gold }), 0, 0.3, 0.15);
+    // Hip pouch + high collar.
+    const pouch = box(this.torso, 0.13, 0.14, 0.09, leatherDark, 0.21, 0, 0.08);
+    pouch.rotation.y = 0.25;
+    sph(this.torso, 0.13, underCloth, 0, 0.55, 0, 1.5, 0.45, 1.2);
     // Skirt of the tunic.
     const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.32, 0.22, 8), tunicDark);
     skirt.position.y = -0.08;
@@ -76,27 +87,37 @@ export class HeroModel {
     // Ears.
     sph(this.head, 0.045, skin, -0.19, 0.12, 0, 0.6, 1, 1.6);
     sph(this.head, 0.045, skin, 0.19, 0.12, 0, 0.6, 1, 1.6);
-    // Eyes: big friendly dark ovals.
+    // Eyes: narrowed, focused.
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0x2a2331 });
     for (const s of [-1, 1]) {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), eyeMat);
       eye.position.set(0.075 * s, 0.13, 0.165);
-      eye.scale.set(0.8, 1.4, 0.5);
+      eye.scale.set(0.85, 1.05, 0.5);
       eye.userData.noOutline = true;
       this.head.add(eye);
     }
-    // Floppy cap: cone base + trailing tip segments.
-    this.cap = pivot(this.head, 0, 0.3, -0.02);
-    const capBase = new THREE.Mesh(new THREE.ConeGeometry(0.185, 0.28, 9), capMat);
-    capBase.position.y = 0.1;
-    capBase.castShadow = true;
-    this.cap.add(capBase);
-    this.capTip = pivot(this.cap, 0, 0.22, -0.05);
-    const capT = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.3, 7), capMat);
-    capT.rotation.x = -1.1;
-    capT.position.set(0, 0.03, -0.12);
-    capT.castShadow = true;
-    this.capTip.add(capT);
+    // Determined brows, angled down toward the nose.
+    const browMat = toonMaterial({ color: 0x4a3418 });
+    for (const s of [-1, 1]) {
+      const brow = box(this.head, 0.085, 0.022, 0.02, browMat, 0.075 * s, 0.19, 0.168);
+      brow.rotation.z = 0.32 * s;
+      brow.userData.noOutline = true;
+    }
+    // Windswept hair: spikes sweeping back off the crown.
+    const spike = (x, y, z, rx, rz, sc = 1) => {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.052 * sc, 0.2 * sc, 6), hair);
+      sp.position.set(x, y, z);
+      sp.rotation.x = rx;
+      sp.rotation.z = rz;
+      sp.castShadow = true;
+      this.head.add(sp);
+    };
+    spike(0, 0.32, -0.02, -0.85, 0, 1.3);
+    spike(-0.1, 0.29, -0.04, -0.75, 0.35, 1.05);
+    spike(0.1, 0.29, -0.04, -0.75, -0.35, 1.05);
+    spike(-0.05, 0.32, 0.08, -0.6, 0.2, 0.7);
+    spike(0.06, 0.32, 0.08, -0.55, -0.24, 0.7);
+    spike(0, 0.24, -0.15, -1.3, 0, 1.15);
 
     // Arms: shoulder → elbow.
     this.armL = pivot(this.torso, -0.28, 0.46, 0);
@@ -105,10 +126,15 @@ export class HeroModel {
     this.elbowR = pivot(this.armR, 0, -0.24, 0);
     for (const [shoulder, elbow] of [[this.armL, this.elbowL], [this.armR, this.elbowR]]) {
       sph(shoulder, 0.085, tunic, 0, 0, 0);
-      box(shoulder, 0.11, 0.26, 0.11, tunic, 0, -0.13, 0);
+      box(shoulder, 0.11, 0.26, 0.11, underCloth, 0, -0.13, 0);
       box(elbow, 0.1, 0.24, 0.1, skin, 0, -0.11, 0);
-      sph(elbow, 0.06, leather, 0, -0.24, 0, 1, 0.9, 1); // glove
+      box(elbow, 0.115, 0.15, 0.115, leatherDark, 0, -0.14, 0); // bracer
+      sph(elbow, 0.06, leatherDark, 0, -0.24, 0, 1, 0.9, 1);    // glove
     }
+    // Layered steel pauldron on the shield shoulder; leather cop on the other.
+    sph(this.armL, 0.105, steel, 0, 0.04, 0, 1.25, 0.75, 1.25);
+    sph(this.armL, 0.09, steel, 0, -0.06, 0, 1.2, 0.6, 1.2);
+    sph(this.armR, 0.095, leather, 0, 0.03, 0, 1.15, 0.7, 1.15);
 
     // Legs: hip → knee.
     this.legL = pivot(this.hips, -0.12, -0.12, 0);
@@ -116,9 +142,10 @@ export class HeroModel {
     this.kneeL = pivot(this.legL, 0, -0.36, 0);
     this.kneeR = pivot(this.legR, 0, -0.36, 0);
     for (const [leg, knee] of [[this.legL, this.kneeL], [this.legR, this.kneeR]]) {
-      box(leg, 0.14, 0.38, 0.15, toonMaterial({ color: 0xd8cfb4 }), 0, -0.18, 0);
+      box(leg, 0.14, 0.38, 0.15, toonMaterial({ color: 0x3a4148 }), 0, -0.18, 0);
       box(knee, 0.13, 0.3, 0.14, boots, 0, -0.14, 0);
-      box(knee, 0.14, 0.09, 0.22, boots, 0, -0.31, 0.04); // foot
+      box(knee, 0.145, 0.06, 0.15, steel, 0, -0.02, 0.01);  // shin-guard rim
+      box(knee, 0.14, 0.09, 0.22, boots, 0, -0.31, 0.04);   // foot
     }
 
     // --- sword + shield ------------------------------------------------------
@@ -134,6 +161,20 @@ export class HeroModel {
     this.backSword.rotation.z = 0.5;
     this.backShield = pivot(this.torso, 0.02, 0.32, -0.2);
     this._buildBackMounts(leather);
+
+    // --- cape ----------------------------------------------------------------
+    // Three hinged segments hanging from the shoulders; update() drives the
+    // trailing sway so it flares at a sprint and settles at rest.
+    this.cape = pivot(this.torso, 0, 0.5, -0.16);
+    this.capeSegs = [];
+    const capeW = [0.5, 0.44, 0.36], capeH = [0.32, 0.32, 0.28];
+    let capeParent = this.cape;
+    for (let i = 0; i < 3; i++) {
+      const seg = pivot(capeParent, 0, i === 0 ? 0 : -capeH[i - 1], 0);
+      box(seg, capeW[i], capeH[i], 0.035, capeMat, 0, -capeH[i] / 2, 0);
+      this.capeSegs.push(seg);
+      capeParent = seg;
+    }
 
     addOutline(this.group, 0.028);
 
@@ -479,10 +520,17 @@ export class HeroModel {
     dr(this.kneeL, 'x', P.kneeL); dr(this.kneeR, 'x', P.kneeR);
     this.root.scale.y = damp(this.root.scale.y, P.scaleY, 20, dt);
 
-    // Cap + hair secondary motion.
+    // Cape secondary motion: streams out with speed, ripples segment by
+    // segment, settles into a gentle idle sway.
     const lean = this.root.rotation.x;
-    this.capTip.rotation.x = damp(this.capTip.rotation.x, -0.3 - lean * 1.4 - amp * 0.5 + Math.sin(t * 3.2) * 0.08, 8, dt);
-    this.cap.rotation.z = damp(this.cap.rotation.z, Math.sin(t * 2.2) * 0.03 + this.root.rotation.z * 0.8, 8, dt);
+    const fl = Math.sin(t * 7.1) * 0.05 + Math.sin(t * 11.7) * 0.03;
+    const seg = this.capeSegs;
+    seg[0].rotation.x = damp(seg[0].rotation.x,
+      0.16 + amp * 0.85 + Math.max(0, lean) * 0.5 + fl * (0.35 + amp), 7, dt);
+    seg[1].rotation.x = damp(seg[1].rotation.x, 0.1 + amp * 0.5 + fl * 1.6, 5.5, dt);
+    seg[2].rotation.x = damp(seg[2].rotation.x, 0.08 + amp * 0.35 + fl * 2.2, 4.5, dt);
+    this.cape.rotation.z = damp(this.cape.rotation.z,
+      this.root.rotation.z * 0.6 + Math.sin(t * 2.3) * 0.025, 6, dt);
 
     // I-frame flicker: emissive pulse on the tunic (no visibility strobing).
     this._blinkT += dt;
