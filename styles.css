@@ -46,6 +46,8 @@ html, body {
   pointer-events: none;
   color: var(--ink);
   overflow: hidden;
+  /* Kill double-tap zoom on every UI control while keeping scroll/pan. */
+  touch-action: manipulation;
 }
 
 /* --- boot splash (pre-JS) ------------------------------------------------ */
@@ -1087,7 +1089,7 @@ body.touch-mode .title-foot { display: none; }
    Touch controls
    ========================================================================== */
 
-.touch { position: absolute; inset: 0; z-index: 20; display: none; }
+.touch { position: absolute; inset: 0; z-index: 20; display: none; touch-action: none; }
 .touch.on { display: block; }
 
 .t-stick-zone {

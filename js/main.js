@@ -15,6 +15,20 @@ function hasWebGL() {
   } catch { return false; }
 }
 
+// Mobile: never let rapid taps or pinches zoom the page. iOS Safari ignores
+// user-scalable=no, so block its gesture events and double-tap directly.
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('touchend', (e) => {
+  // Only for the canvas + touch-control layer — menu buttons keep their
+  // synthesized clicks (they're covered by touch-action: manipulation).
+  if (e.target && e.target.closest && e.target.closest('#game, .touch')) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
 window.addEventListener('DOMContentLoaded', () => {
   if (!hasWebGL()) {
     fatal('This adventure needs WebGL, which your browser has disabled.');
