@@ -9,22 +9,22 @@ export class Quests {
     // Public defs (UI reads titles + per-stage objective text).
     this.defs = {
       'shattered-star': {
-        title: 'The Shattered Star',
+        title: 'The Great Celestial Screw-Up',
         main: true,
         objectives: {
-          1: 'Seek the Hollow Shrine in the far north of the Elderwood.',
-          2: 'Return to Elder Maren in Brindlemere with the Sunblade.',
+          1: 'Find the Hollow Shrine up north and un-screw whatever the star screwed up.',
+          2: 'Haul the Sunblade back to Elder Maren before she dies of old age and spite.',
         },
         done: 3,
       },
       'mushroom-medicine': {
-        title: 'Mushroom Medicine',
-        objectives: { 1: 'Gather glowshrooms in the Elderwood (need 5).' },
+        title: 'Shroom Service',
+        objectives: { 1: 'Grab 5 glowshrooms for Nyla. Do NOT lick them.' },
         done: 2,
       },
       'thin-the-horde': {
-        title: 'Thin the Horde',
-        objectives: { 1: 'Defeat boglins for Captain Bram (10).' },
+        title: 'Pest Control (Extremely Violent)',
+        objectives: { 1: 'Un-alive 10 boglins for Captain Bram. Avenge his mooning.' },
         done: 2,
       },
     };
@@ -36,8 +36,8 @@ export class Quests {
         if (q.count < 10) {
           q.count++;
           this._notify('thin-the-horde', q.count >= 10
-            ? 'The horde is thinned! Report to Captain Bram.'
-            : `Boglins defeated: ${q.count}/10`);
+            ? 'Horde thoroughly murdered! Go brag to Captain Bram.'
+            : `Boglins un-alived: ${q.count}/10`);
         }
       }
     });
@@ -45,8 +45,8 @@ export class Quests {
       if (id === 'glowshroom' && this.stage('mushroom-medicine') === 1) {
         const n = game.state.items.glowshroom || 0;
         this._notify('mushroom-medicine', n >= 5
-          ? 'Bring the glowshrooms to Nyla.'
-          : `Glowshrooms gathered: ${Math.min(n, 5)}/5`);
+          ? 'Take the shrooms to Nyla. Still un-licked, hopefully.'
+          : `Glowshrooms grabbed (not licked): ${Math.min(n, 5)}/5`);
       }
     });
     ev.on('boss:end', ({ victory }) => {
@@ -99,8 +99,8 @@ export class Quests {
       const st = this.stage(id);
       if (st > 0 && st < def.done) {
         let text = def.objectives[st] || '';
-        if (id === 'thin-the-horde') text = `Defeat boglins for Captain Bram (${Math.min(this.get(id).count, 10)}/10).`;
-        if (id === 'mushroom-medicine') text = `Gather glowshrooms in the Elderwood (${Math.min(this.game.state.items.glowshroom || 0, 5)}/5).`;
+        if (id === 'thin-the-horde') text = `Un-alive boglins for Captain Bram (${Math.min(this.get(id).count, 10)}/10).`;
+        if (id === 'mushroom-medicine') text = `Grab glowshrooms, no licking (${Math.min(this.game.state.items.glowshroom || 0, 5)}/5).`;
         return { title: def.title, text };
       }
     }
@@ -130,7 +130,7 @@ export class Quests {
     g.state.gems += 100;
     g.events.emit('gems', { total: g.state.gems, delta: 100 });
     g.addMaxHeart();
-    g.events.emit('toast', { text: 'Elder Maren blesses you: +1 heart container, +100 gems!' });
+    g.events.emit('toast', { text: 'Maren blesses your shapely ass: +1 heart container, +100 gems!' });
   }
 
   startShrooms() { if (this.stage('mushroom-medicine') === 0) this.setStage('mushroom-medicine', 1); }
@@ -148,7 +148,7 @@ export class Quests {
     g.events.emit('gems', { total: g.state.gems, delta: 40 });
     g.events.emit('item:added', { id: 'potion', name: 'Restorative Potion' });
     this.setStage('mushroom-medicine', 2);
-    g.events.emit('toast', { text: 'Nyla brews you 2 potions (+40 gems)!' });
+    g.events.emit('toast', { text: 'Nyla brews 2 potions. They taste like feet. (+40 gems)' });
   }
 
   startHorde() { if (this.stage('thin-the-horde') === 0) this.setStage('thin-the-horde', 1); }
@@ -163,6 +163,6 @@ export class Quests {
     g.state.maxStamina += 25;
     g.state.stamina = g.state.maxStamina;
     this.setStage('thin-the-horde', 2);
-    g.events.emit('toast', { text: 'Bram’s training: +25 max stamina, +80 gems!' });
+    g.events.emit('toast', { text: 'Bram’s dubious monk training: +25 max stamina, +80 gems!' });
   }
 }
