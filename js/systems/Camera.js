@@ -35,7 +35,7 @@ export class ThirdPersonCamera {
     const sens = 0.0026;
     this.yaw -= input.look.dx * sens;
     this.pitch = clamp(this.pitch - input.look.dy * sens, -1.15, 0.55);
-    this.targetDistance = clamp(this.targetDistance + input.wheel * 0.8, 3.5, 13);
+    this.targetDistance = clamp(this.targetDistance + input.wheel * 0.8, 2.6, 20);
 
     // Lock-on gently steers yaw to keep player+enemy framed.
     if (this.lockTarget && this.lockTarget.alive) {

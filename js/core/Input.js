@@ -20,8 +20,8 @@ export class Input {
     // Held actions.
     this._held = new Set();
 
-    // Touch UI writes here: {x, z, lookDx, lookDy, held:Set, pressed:[]}
-    this.virtual = { x: 0, z: 0, lookDx: 0, lookDy: 0, held: new Set(), pressed: [] };
+    // Touch UI writes here: {x, z, lookDx, lookDy, pinch, held:Set, pressed:[]}
+    this.virtual = { x: 0, z: 0, lookDx: 0, lookDy: 0, pinch: 0, held: new Set(), pressed: [] };
 
     this._prevPadButtons = [];
     this._bind();
@@ -157,7 +157,8 @@ export class Input {
     const v = this.virtual;
     if (v.x || v.z) { this.move.x = v.x; this.move.z = v.z; }
     this.look.dx += v.lookDx; this.look.dy += v.lookDy;
-    v.lookDx = 0; v.lookDy = 0;
+    this.wheel += v.pinch;
+    v.lookDx = 0; v.lookDy = 0; v.pinch = 0;
     for (const a of v.pressed) this._pressed.add(a);
     v.pressed.length = 0;
     for (const a of v.held) this._held.add(a);

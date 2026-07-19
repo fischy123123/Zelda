@@ -31,28 +31,41 @@ export class Touch {
     this.stickZone.addEventListener('pointerup', (e) => this._stickUp(e));
     this.stickZone.addEventListener('pointercancel', (e) => this._stickUp(e));
 
-    // --- right-half look drag ------------------------------------------------
+    // --- right-half look drag + two-finger pinch zoom ------------------------
+    // One finger orbits the camera; a second finger turns the pair into a
+    // pinch that writes zoom into input.virtual.pinch (spread = zoom in).
     this.lookZone = el('div', 't-look-zone', layer);
-    this._lookId = null;
-    this._lookX = 0;
-    this._lookY = 0;
+    this._lookPts = new Map(); // pointerId → {x, y}
+    this._pinchDist = 0;
     this.lookZone.addEventListener('pointerdown', (e) => {
-      if (this._lookId !== null) return;
-      this._lookId = e.pointerId;
-      this._lookX = e.clientX;
-      this._lookY = e.clientY;
-      this.lookZone.setPointerCapture(e.pointerId);
+      if (this._lookPts.size >= 2) return;
+      this._lookPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { this.lookZone.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+      if (this._lookPts.size === 2) {
+        const [a, b] = [...this._lookPts.values()];
+        this._pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+      }
       e.preventDefault();
     });
     this.lookZone.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== this._lookId) return;
+      const pt = this._lookPts.get(e.pointerId);
+      if (!pt) return;
       const v = this.game.input.virtual;
-      v.lookDx += (e.clientX - this._lookX) * LOOK_SENS;
-      v.lookDy += (e.clientY - this._lookY) * LOOK_SENS;
-      this._lookX = e.clientX;
-      this._lookY = e.clientY;
+      if (this._lookPts.size === 2) {
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const [a, b] = [...this._lookPts.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        v.pinch += (this._pinchDist - d) * 0.045;
+        this._pinchDist = d;
+      } else {
+        v.lookDx += (e.clientX - pt.x) * LOOK_SENS;
+        v.lookDy += (e.clientY - pt.y) * LOOK_SENS;
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+      }
     });
-    const lookEnd = (e) => { if (e.pointerId === this._lookId) this._lookId = null; };
+    const lookEnd = (e) => { this._lookPts.delete(e.pointerId); this._pinchDist = 0; };
     this.lookZone.addEventListener('pointerup', lookEnd);
     this.lookZone.addEventListener('pointercancel', lookEnd);
 
@@ -162,7 +175,8 @@ export class Touch {
     v.held.delete('attack');
     v.held.delete('guard');
     this._stickId = null;
-    this._lookId = null;
+    this._lookPts.clear();
+    this._pinchDist = 0;
     this.stickKnob.style.transform = 'translate(0px, 0px)';
     this.stickBase.classList.remove('live');
     this.btnAttack.classList.remove('pressed');
