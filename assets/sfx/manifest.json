@@ -1,6 +1,13 @@
 {
   "version": 1,
-  "generated": null,
+  "generated": "2026-08-04T02:42:06.120Z",
   "note": "Placeholder — no generated sound effects yet. Run `node tools/gen-sfx.mjs`, or use the 'Generate audio' workflow. The game synthesizes every effect procedurally without this.",
-  "sounds": {}
+  "sounds": {
+    "sword1": {
+      "file": "sword1.mp3",
+      "seconds": 0.5,
+      "bytes": 8821,
+      "promptKey": "28c0af85f29f"
+    }
+  }
 }
