@@ -106,10 +106,24 @@ export class Game {
     this.player.respawn(SPAWN.x, SPAWN.z, Math.PI);
     this.cameraRig.snapBehind(this.player, 0.3);
 
-    // First user gesture unlocks audio.
-    const unlock = () => { this.audio.resume?.(); };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
+    // Audio unlock. Mobile browsers (iOS Safari especially) routinely ignore
+    // the first attempt, and a context that started fine can be suspended
+    // again by backgrounding the tab or an incoming call — so keep retrying on
+    // every gesture until sound is genuinely running, and re-check on return.
+    const UNLOCK_EVENTS = ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'];
+    const unlock = () => {
+      this.audio.resume?.();
+      if (this.audio.running) {
+        for (const ev of UNLOCK_EVENTS) window.removeEventListener(ev, unlock);
+      }
+    };
+    for (const ev of UNLOCK_EVENTS) {
+      window.addEventListener(ev, unlock, { passive: true });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this.audio.resume?.();
+    });
+    window.addEventListener('pageshow', () => this.audio.resume?.());
 
     this._wireEvents();
 

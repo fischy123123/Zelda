@@ -200,6 +200,21 @@ export class Menus {
     });
     this._hoverFocus(this.invertBtn);
 
+    // Mobile browsers can refuse to start audio, and iOS silences WebAudio
+    // entirely when the ring/silent switch is on. Surface the real state here
+    // and let a tap force another unlock attempt.
+    const sndRow = el('div', 'set-row', p);
+    el('label', null, sndRow, 'Sound');
+    this.soundBtn = el('button', 'toggle', sndRow, '…');
+    this.soundBtn.type = 'button';
+    this.soundBtn.addEventListener('click', () => {
+      this.game.audio.resume?.();
+      this.ui.sfx('ui_select');
+      setTimeout(() => this._refreshSound(), 120);
+    });
+    this._hoverFocus(this.soundBtn);
+    this.soundHint = el('div', 'set-hint', p, '');
+
     const qRow = el('div', 'set-row', p);
     el('label', null, qRow, 'Quality');
     el('span', 'set-static', qRow,
@@ -217,6 +232,16 @@ export class Menus {
       s.val.textContent = String(v);
     }
     this._refreshInvert();
+    this._refreshSound();
+  }
+
+  _refreshSound() {
+    if (!this.soundBtn) return;
+    const running = !!this.game.audio.running;
+    this.soundBtn.textContent = running ? 'On' : 'Tap to enable';
+    this.soundHint.textContent = running
+      ? 'On iPhone, flip the side ring/silent switch off if you still hear nothing.'
+      : 'Audio has not started yet — tap the button above.';
   }
 
   _refreshInvert() {

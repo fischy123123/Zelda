@@ -213,6 +213,10 @@ const MOOD_FADE = 2.0;          // seconds of crossfade between moods
 const LOOKAHEAD = 0.12;         // scheduler lookahead window (s)
 const STORE_KEY = 'aurelia-audio';
 
+// ~50ms of silence. Played through an <audio> element on the first gesture
+// so iOS treats this page as media playback (see resume()).
+const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+
 // ---------------------------------------------------------------------------
 export class AudioEngine {
   constructor(game) {
@@ -262,11 +266,91 @@ export class AudioEngine {
   }
 
   // -- public API ------------------------------------------------------------
+  /**
+   * Bring audio to life. Safe to call repeatedly — Game retries on every
+   * gesture until the context is genuinely running, because a single tap is
+   * not reliable on mobile.
+   *
+   * iOS Safari needs three things beyond a plain resume():
+   *  1. An audio session of type "playback", or WebAudio is silenced by the
+   *     physical ring/silent switch — the usual reason an iPhone plays
+   *     nothing at all while everything looks fine in code.
+   *  2. A media element played once inside a real gesture, which promotes the
+   *     session on versions predating navigator.audioSession.
+   *  3. A buffer actually started on the context to finish unlocking it.
+   */
   resume() {
+    this._claimPlaybackSession();
     if (!this.ctx) this._build();
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
+    if (!this.ctx) return;
+    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    this._primeMediaElement();
+    this._kick();
+  }
+
+  /** True once sound can actually be heard. */
+  get running() { return !!this.ctx && this.ctx.state === 'running'; }
+
+  /** Tell iOS this page is media playback, not an incidental UI beep. */
+  _claimPlaybackSession() {
+    try {
+      const sess = navigator.audioSession;
+      if (sess && sess.type !== 'playback') sess.type = 'playback';
+    } catch (e) { /* not supported — the media-element path below covers it */ }
+  }
+
+  /**
+   * Play a fragment of silence through an <audio> element. Media elements use
+   * the playback audio category on iOS, which drags WebAudio out from under
+   * the mute switch on versions without navigator.audioSession.
+   */
+  _primeMediaElement() {
+    if (this._primed) return;
+    try {
+      if (!this._silentEl) {
+        const el = new Audio(SILENT_WAV);
+        el.setAttribute('playsinline', '');
+        el.preload = 'auto';
+        el.loop = false;
+        el.volume = 0.001;
+        this._silentEl = el;
+      }
+      const p = this._silentEl.play();
+      if (p && p.then) p.then(() => { this._primed = true; }).catch(() => {});
+      else this._primed = true;
+    } catch (e) { /* blocked until a real gesture; we retry on the next one */ }
+  }
+
+  /** Start a one-sample silent buffer — the classic iOS WebAudio unlock. */
+  _kick() {
+    if (this._kicked || !this.ctx) return;
+    try {
+      const b = this.ctx.createBuffer(1, 1, 22050);
+      const src = this.ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(this.ctx.destination);
+      src.start(0);
+      this._kicked = true;
+    } catch (e) { /* retry next gesture */ }
+  }
+
+  /** Snapshot for debugging mobile audio: window.game.audio.diagnostics(). */
+  diagnostics() {
+    return {
+      contextState: this.ctx ? this.ctx.state : 'not-created',
+      sampleRate: this.ctx ? this.ctx.sampleRate : null,
+      audioSession: (() => {
+        try { return navigator.audioSession ? navigator.audioSession.type : 'unsupported'; }
+        catch (e) { return 'error'; }
+      })(),
+      mediaElementPrimed: !!this._primed,
+      contextKicked: !!this._kicked,
+      volumes: this.volumes,
+      masterGain: this.master ? this.master.gain.value : null,
+      hint: this.running
+        ? 'Audio is running. If you still hear nothing, check the iPhone ring/silent switch and the volume rocker.'
+        : 'Audio is not running yet — tap the screen once.',
+    };
   }
 
   get volumes() {
