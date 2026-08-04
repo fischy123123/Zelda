@@ -107,6 +107,12 @@ export class SfxPack {
 // ---------------------------------------------------------------------------
 const FADE = 1.8;
 
+// Generated tracks arrive at commercial loudness — measured ~14x hotter than
+// the procedural score they replace, and level with the voice clips, which
+// buried dialogue completely. This trim seats them a little above where the
+// synthesized score sat. A track may override it with a `gain` in the manifest.
+const MUSIC_TRIM = 0.15;
+
 export class MusicPack {
   constructor(game) {
     this.game = game;
@@ -162,7 +168,7 @@ export class MusicPack {
     pl.el.play().catch(() => {});
     pl.gain.gain.cancelScheduledValues(now);
     pl.gain.gain.setValueAtTime(pl.gain.gain.value, now);
-    pl.gain.gain.linearRampToValueAtTime(1, now + FADE);
+    pl.gain.gain.linearRampToValueAtTime(pl.trim, now + FADE);
     this.current = mood;
     return true;
   }
@@ -195,8 +201,11 @@ export class MusicPack {
       const gain = ctx.createGain();
       gain.gain.value = 0;
       node.connect(gain);
-      gain.connect(audio.musicBus || audio.master);
-      pl = { el, node, gain };
+      // Through _musicDuck, not straight to the bus: that node is what dips
+      // the score under dialogue, and bypassing it was why voices were buried.
+      gain.connect(audio._musicDuck || audio.musicBus || audio.master);
+      const trim = typeof entry.gain === 'number' ? entry.gain : MUSIC_TRIM;
+      pl = { el, node, gain, trim };
       this._players.set(mood, pl);
       return pl;
     } catch (e) {

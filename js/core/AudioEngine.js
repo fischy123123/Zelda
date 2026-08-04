@@ -395,7 +395,7 @@ export class AudioEngine {
 
     // Duck the score when the hero falls, and again under voiced dialogue
     // so speech stays intelligible over the music.
-    const duckT = this.game.mode === 'dead' ? 0.12 : (this._voiceDucking ? 0.35 : 1);
+    const duckT = this.game.mode === 'dead' ? 0.12 : (this._voiceDucking ? 0.28 : 1);
     this._duck += (duckT - this._duck) * Math.min(1, rawDt * 1.5);
     this._musicDuck.gain.value = this._duck;
 
