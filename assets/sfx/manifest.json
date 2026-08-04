@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "generated": null,
+  "note": "Placeholder — no generated sound effects yet. Run `node tools/gen-sfx.mjs`, or use the 'Generate audio' workflow. The game synthesizes every effect procedurally without this.",
+  "sounds": {}
+}

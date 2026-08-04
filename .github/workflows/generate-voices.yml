@@ -1,31 +1,41 @@
-# Generate the voiced-dialogue pack with ElevenLabs, entirely from the GitHub
-# website — no local checkout or terminal needed.
+# Generate audio for Aurelia with ElevenLabs, entirely from the GitHub website
+# — no local checkout or terminal needed.
 #
 # One-time setup:
 #   Settings → Secrets and variables → Actions → New repository secret
 #   Name: ELEVENLABS_API_KEY     Secret: your sk_... key
 #
 # To run:
-#   Actions tab → "Generate voices" → Run workflow
+#   Actions tab → "Generate audio" → Run workflow
 #
-# Leave "dry_run" checked the first time: it reports how many lines and
-# characters would be generated without spending any credits.
+# Leave "dry_run" checked the first time: it reports what each generator would
+# do and what it would cost, without spending anything.
 
-name: Generate voices
+name: Generate audio
 
 on:
   workflow_dispatch:
     inputs:
+      what:
+        description: 'What to generate'
+        type: choice
+        default: voices
+        options:
+          - voices
+          - sound effects
+          - music
+          - voices + sound effects
+          - everything
       dry_run:
         description: 'Preview only — report cost, generate nothing'
         type: boolean
         default: true
       force:
-        description: 'Re-record every line, even ones already generated'
+        description: 'Regenerate everything, even unchanged items'
         type: boolean
         default: false
       only:
-        description: 'Limit to one character (maren, nyla, bram, tam, pip, rho)'
+        description: 'Limit to one item (e.g. bram, sword1, village)'
         type: string
         default: ''
 
@@ -33,7 +43,7 @@ permissions:
   contents: write
 
 jobs:
-  voices:
+  audio:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the game
@@ -59,16 +69,37 @@ jobs:
       - name: Generate
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          WHAT: ${{ inputs.what }}
         run: |
           ARGS=""
           if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
           if [ "${{ inputs.force }}" = "true" ]; then ARGS="$ARGS --force"; fi
           if [ -n "${{ inputs.only }}" ]; then ARGS="$ARGS --only ${{ inputs.only }}"; fi
-          echo "Running: node tools/gen-voices.mjs $ARGS"
-          node tools/gen-voices.mjs $ARGS 2>&1 | tee run.log
-          # Surface the summary on the workflow's front page.
+
+          run_one () {
+            echo ""
+            echo "=============================================="
+            echo " $1"
+            echo "=============================================="
+            node "$2" $ARGS 2>&1 | tee -a run.log || echo "(that generator stopped early — see above)"
+          }
+
+          : > run.log
+          case "$WHAT" in
+            "voices")               run_one "Voices"        tools/gen-voices.mjs ;;
+            "sound effects")        run_one "Sound effects" tools/gen-sfx.mjs ;;
+            "music")                run_one "Music"         tools/gen-music.mjs ;;
+            "voices + sound effects")
+              run_one "Voices"        tools/gen-voices.mjs
+              run_one "Sound effects" tools/gen-sfx.mjs ;;
+            "everything")
+              run_one "Voices"        tools/gen-voices.mjs
+              run_one "Sound effects" tools/gen-sfx.mjs
+              run_one "Music"         tools/gen-music.mjs ;;
+          esac
+
           {
-            echo '## Voice generation'
+            echo '## Audio generation'
             echo '```'
             cat run.log
             echo '```'
@@ -80,17 +111,17 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- assets/voice && git diff --quiet --cached -- assets/voice \
-             && [ -z "$(git ls-files --others --exclude-standard assets/voice)" ]; then
-            echo "Nothing changed — every line was already generated."
+          if [ -z "$(git status --porcelain assets)" ]; then
+            echo "Nothing changed — everything was already generated."
             exit 0
           fi
-          git add assets/voice
-          git commit -m "Add generated voice pack (ElevenLabs)"
-          # Bust the browser cache so phones pick the new audio up on reload.
-          HASH=$(git rev-parse --short HEAD)
-          sed -i "s|js/main\.js?v=[0-9a-f]*|js/main.js?v=$HASH|" index.html
-          git add index.html
-          git commit -m "Bump cache-bust version for voice pack"
+          git add assets
+          git commit -m "Generate audio pack (ElevenLabs)"
+          # Re-stamp so every module and asset busts cache together.
+          node tools/stamp-version.mjs
+          if [ -n "$(git status --porcelain index.html)" ]; then
+            git add index.html
+            git commit -m "Re-stamp version for new audio"
+          fi
           git push
-          echo "Pushed. Reload the game and dialogue will be voiced." >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed. Reload the game to hear it." >> "$GITHUB_STEP_SUMMARY"

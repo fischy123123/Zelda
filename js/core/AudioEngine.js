@@ -6,6 +6,7 @@
 // module is completely silent and inert.
 
 import { SITES, LAKE } from '../world/layout.js';
+import { SfxPack, MusicPack } from './Samples.js';
 
 // ---------------------------------------------------------------------------
 // Pattern helpers. Sequences are authored on an eighth-note grid:
@@ -248,6 +249,11 @@ export class AudioEngine {
     this._duck = 1;
     this._voiceDucking = false;
 
+    // Optional generated audio. Absent packs simply never take over.
+    this.sfxPack = new SfxPack(game);
+    this.musicPack = new MusicPack(game);
+    this._warmed = false;
+
     // Context flags fed by events.
     this._bossActive = false;
     this._victoryTimer = 0;
@@ -393,6 +399,11 @@ export class AudioEngine {
     this._duck += (duckT - this._duck) * Math.min(1, rawDt * 1.5);
     this._musicDuck.gain.value = this._duck;
 
+    if (!this._warmed && this.sfxPack.available) {
+      this._warmed = true;
+      this.sfxPack.warm();
+    }
+
     this._tickSequencer();
     this._updateAmbience(rawDt);
   }
@@ -408,6 +419,9 @@ export class AudioEngine {
     const last = this._lastSfx[name];
     if (last !== undefined && now - last < minGap) return;
     this._lastSfx[name] = now;
+    // A generated effect wins when one exists and is decoded; otherwise the
+    // procedural voice plays, so coverage gaps are inaudible.
+    if (this.sfxPack.play(name, { gain: (opts && opts.gain) || 1 })) return;
     this._playSfx(name, now + 0.002, opts || {});
   }
 
@@ -629,6 +643,21 @@ export class AudioEngine {
   _applyMood(name) {
     if (name === this._mood || !this.ctx) return;
     const now = this.ctx.currentTime;
+    // Generated track for this mood? Then silence the sequencer entirely
+    // rather than layering two scores on top of each other.
+    const generated = this.musicPack.setMood(name);
+    if (generated) {
+      if (this._mood) {
+        const old = this._moodGain(this._mood);
+        old.gain.cancelScheduledValues(now);
+        old.gain.setValueAtTime(old.gain.value, now);
+        old.gain.linearRampToValueAtTime(0, now + MOOD_FADE);
+      }
+      this._mood = name;
+      this._pattern = null;
+      return;
+    }
+    this.musicPack.fadeOutAll();
     if (this._mood) {
       const old = this._moodGain(this._mood);
       old.gain.cancelScheduledValues(now);
@@ -649,6 +678,7 @@ export class AudioEngine {
 
   // -- sequencer -------------------------------------------------------------
   _tickSequencer() {
+    if (!this._pattern) return;   // a generated track is playing instead
     const now = this.ctx.currentTime;
     if (this._nextStep < now - 0.35) this._nextStep = now + 0.05; // resync after tab-sleep
     while (this._nextStep < now + LOOKAHEAD) {

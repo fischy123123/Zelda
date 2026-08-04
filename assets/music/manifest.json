@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "generated": null,
+  "note": "Placeholder — no generated music yet. Run `node tools/gen-music.mjs`, or use the 'Generate audio' workflow. The game plays its procedural leitmotif score without this.",
+  "tracks": {}
+}
