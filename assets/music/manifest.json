@@ -7,43 +7,61 @@
       "file": "title.mp3",
       "ms": 45000,
       "bytes": 719770,
-      "promptKey": "16aa6765c87e"
+      "promptKey": "16aa6765c87e",
+      "gain": 0.188,
+      "measuredRms": 0.1598
     },
     "explore": {
       "file": "explore.mp3",
       "ms": 50000,
       "bytes": 800018,
-      "promptKey": "2aa9ed3b07bb"
+      "promptKey": "2aa9ed3b07bb",
+      "gain": 0.281,
+      "measuredRms": 0.1067
     },
     "village": {
       "file": "village.mp3",
       "ms": 45000,
       "bytes": 719770,
-      "promptKey": "205646d30224"
+      "promptKey": "205646d30224",
+      "gain": 0.213,
+      "measuredRms": 0.1409
     },
     "night": {
       "file": "night.mp3",
       "ms": 45000,
       "bytes": 720606,
-      "promptKey": "5c57b257e501"
+      "promptKey": "5c57b257e501",
+      "gain": 0.381,
+      "measuredRms": 0.0788
     },
     "combat": {
       "file": "combat.mp3",
       "ms": 40000,
       "bytes": 639522,
-      "promptKey": "18f1f19534df"
+      "promptKey": "18f1f19534df",
+      "gain": 0.152,
+      "measuredRms": 0.1977
     },
     "boss": {
       "file": "boss.mp3",
       "ms": 40000,
       "bytes": 640358,
-      "promptKey": "23056aa383a1"
+      "promptKey": "23056aa383a1",
+      "gain": 0.149,
+      "measuredRms": 0.2008
     },
     "dungeon": {
       "file": "dungeon.mp3",
       "ms": 45000,
       "bytes": 719770,
-      "promptKey": "3c15ced5cc4a"
+      "promptKey": "3c15ced5cc4a",
+      "gain": 0.203,
+      "measuredRms": 0.148
     }
+  },
+  "normalized": {
+    "target": 0.03,
+    "at": "2026-08-04T03:04:33.929Z"
   }
 }

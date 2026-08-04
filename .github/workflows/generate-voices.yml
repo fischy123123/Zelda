@@ -84,18 +84,34 @@ jobs:
             node "$2" $ARGS 2>&1 | tee -a run.log || echo "(that generator stopped early — see above)"
           }
 
+          # Tracks come back at wildly different loudness; even them out so no
+          # mood is twice as loud as the next. Best-effort: needs a browser to
+          # decode mp3, and the music is still usable without it.
+          normalize_music () {
+            if [ "${{ inputs.dry_run }}" = "true" ]; then return 0; fi
+            echo "" | tee -a run.log
+            echo "--- Normalizing music levels ---" | tee -a run.log
+            npm i -D playwright >/dev/null 2>&1 || true
+            npx playwright install --with-deps chromium >/dev/null 2>&1 || true
+            node tools/normalize-music.mjs 2>&1 | tee -a run.log \
+              || echo "(normalization skipped — tracks keep their default trim)" | tee -a run.log
+          }
+
           : > run.log
           case "$WHAT" in
             "voices")               run_one "Voices"        tools/gen-voices.mjs ;;
             "sound effects")        run_one "Sound effects" tools/gen-sfx.mjs ;;
-            "music")                run_one "Music"         tools/gen-music.mjs ;;
+            "music")
+              run_one "Music"         tools/gen-music.mjs
+              normalize_music ;;
             "voices + sound effects")
               run_one "Voices"        tools/gen-voices.mjs
               run_one "Sound effects" tools/gen-sfx.mjs ;;
             "everything")
               run_one "Voices"        tools/gen-voices.mjs
               run_one "Sound effects" tools/gen-sfx.mjs
-              run_one "Music"         tools/gen-music.mjs ;;
+              run_one "Music"         tools/gen-music.mjs
+              normalize_music ;;
           esac
 
           {

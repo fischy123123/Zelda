@@ -391,12 +391,23 @@ export class AudioEngine {
       this._moodPoll = 0.25;
       this._scanCombat();
       this._applyMood(this._pickMood());
+      // The title mood is applied before the first user gesture, while the
+      // context is still suspended and setMood() must decline — and once
+      // _mood is set, _applyMood never revisits it. Catch that here so a
+      // generated track still takes over the moment audio comes alive.
+      if (this._mood && this._pattern && this.musicPack.has(this._mood)) {
+        this._handOffToTrack(this._mood, this.ctx.currentTime);
+      }
     }
 
     // Duck the score when the hero falls, and again under voiced dialogue
     // so speech stays intelligible over the music.
     const duckT = this.game.mode === 'dead' ? 0.12 : (this._voiceDucking ? 0.28 : 1);
-    this._duck += (duckT - this._duck) * Math.min(1, rawDt * 1.5);
+    // Asymmetric, like a real ducker: get out of the way almost immediately
+    // when a line starts, then ease back so the music does not lurch. A single
+    // slow rate meant the first second or two of every line stayed buried.
+    const duckRate = duckT < this._duck ? 9 : 1.6;
+    this._duck += (duckT - this._duck) * Math.min(1, rawDt * duckRate);
     this._musicDuck.gain.value = this._duck;
 
     if (!this._warmed && this.sfxPack.available) {
@@ -645,18 +656,7 @@ export class AudioEngine {
     const now = this.ctx.currentTime;
     // Generated track for this mood? Then silence the sequencer entirely
     // rather than layering two scores on top of each other.
-    const generated = this.musicPack.setMood(name);
-    if (generated) {
-      if (this._mood) {
-        const old = this._moodGain(this._mood);
-        old.gain.cancelScheduledValues(now);
-        old.gain.setValueAtTime(old.gain.value, now);
-        old.gain.linearRampToValueAtTime(0, now + MOOD_FADE);
-      }
-      this._mood = name;
-      this._pattern = null;
-      return;
-    }
+    if (this._handOffToTrack(name, now)) return;
     this.musicPack.fadeOutAll();
     if (this._mood) {
       const old = this._moodGain(this._mood);
@@ -674,6 +674,24 @@ export class AudioEngine {
     this._stepDur = 60 / this._pattern.bpm / 2; // eighth notes
     this._step = 0;
     this._nextStep = Math.max(this._nextStep, now + 0.06);
+  }
+
+  /**
+   * Hand a mood over to its generated track, muting the sequencer. Returns
+   * false when there is no track (or audio is not running yet), leaving the
+   * procedural score in charge.
+   */
+  _handOffToTrack(name, now) {
+    if (!this.musicPack.setMood(name)) return false;
+    if (this._mood) {
+      const old = this._moodGain(this._mood);
+      old.gain.cancelScheduledValues(now);
+      old.gain.setValueAtTime(old.gain.value, now);
+      old.gain.linearRampToValueAtTime(0, now + MOOD_FADE);
+    }
+    this._mood = name;
+    this._pattern = null;
+    return true;
   }
 
   // -- sequencer -------------------------------------------------------------
