@@ -1,32 +1,35 @@
 {
-  "version": 1,
-  "model": "eleven_multilingual_v2",
-  "generated": "2026-08-04T01:54:04.153Z",
-  "note": "Placeholder — no voice pack generated yet. Run `node tools/gen-voices.mjs` with an ELEVENLABS_API_KEY to fill this in. The game plays normally either way.",
+  "version": 2,
   "voices": {
     "maren": {
-      "voiceId": "CwhRBWXzGAHq8TQ4Fs17",
-      "voiceName": "Roger - Laid-Back, Casual, Resonant"
+      "voiceId": "XrExE9yKIg1WjnnlVkGX",
+      "voiceName": "Matilda - Knowledgable, Professional",
+      "note": "Ancient village elder. Foul-mouthed, warm, zero patience."
     },
     "nyla": {
-      "voiceId": "EXAVITQu4vr4xnSDxMaL",
-      "voiceName": "Sarah - Mature, Reassuring, Confident"
+      "voiceId": "Xb7hH8MSUJpSbSDYk0k2",
+      "voiceName": "Alice - Clear, Engaging Educator",
+      "note": "Healer. Brisk, dry, mothers you while insulting you."
     },
     "bram": {
-      "voiceId": "FGY2WhTYpPnrIDTdsKH5",
-      "voiceName": "Laura - Enthusiast, Quirky Attitude"
+      "voiceId": "N2lVS1w4EtoT3dr4eOWO",
+      "voiceName": "Callum - Husky Trickster",
+      "note": "Guard captain. Loud, gravelly, aggressively enthusiastic."
     },
     "tam": {
-      "voiceId": "IKne3meq5aSn9XLyUdCD",
-      "voiceName": "Charlie - Deep, Confident, Energetic"
+      "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+      "voiceName": "George - Warm, Captivating Storyteller",
+      "note": "Shopkeep. Smooth, jovial, shameless salesman."
     },
     "pip": {
-      "voiceId": "JBFqnCBsd6RMkjVDRZzb",
-      "voiceName": "George - Warm, Captivating Storyteller"
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "voiceName": "Jessica - Playful, Bright, Warm",
+      "note": "Excitable kid. Fast, breathless, delighted with himself."
     },
     "rho": {
-      "voiceId": "N2lVS1w4EtoT3dr4eOWO",
-      "voiceName": "Callum - Husky Trickster"
+      "voiceId": "pqHfZKP75CvOlQylNhV4",
+      "voiceName": "Bill - Wise, Mature, Balanced",
+      "note": "Farmer. Slow, weathered, quietly amused."
     }
   },
   "lines": {
@@ -34,358 +37,411 @@
       "file": "maren/755bff4a8e9e4870.mp3",
       "speaker": "maren",
       "text": "Oh good, another wandering jackass with a sword. Welcome to Brindlemere. I am Maren, elder of this valley, which means I am old as balls and nobody listens to me.",
-      "chars": 162,
-      "bytes": 165973
+      "chars": 181,
+      "bytes": 166391,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[dry, unimpressed] Oh good, another wandering jackass with a sword. Welcome to Brindlemere. I am Maren, elder of this valley, which means I am old as balls and nobody listens to me."
     },
     "315ba9f75ff5c6bd": {
       "file": "maren/315ba9f75ff5c6bd.mp3",
       "speaker": "maren",
       "text": "Seventy years ago a star exploded over the northern sky and took a flaming dump all over the Elderwood. Prettiest damn catastrophe I ever saw.",
-      "chars": 142,
-      "bytes": 134208
+      "chars": 163,
+      "bytes": 157196,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Seventy years ago a star exploded over the northern sky and took a flaming dump all over the Elderwood. Prettiest damn catastrophe I ever saw."
     },
     "11af51fba9c19591": {
       "file": "maren/11af51fba9c19591.mp3",
       "speaker": "maren",
       "text": "Where it landed, the old shrine — the Hollow Shrine — slammed itself shut like an outhouse door in a windstorm. And ever since, the boglins have been breeding like drunk rabbits.",
-      "chars": 178,
-      "bytes": 167645
+      "chars": 199,
+      "bytes": 168899,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Where it landed, the old shrine — the Hollow Shrine — slammed itself shut like an outhouse door in a windstorm. And ever since, the boglins have been breeding like drunk rabbits."
     },
     "6a85dac854ddc272": {
       "file": "maren/6a85dac854ddc272.mp3",
       "speaker": "maren",
       "text": "The Hollow Shrine is older than any kingdom, older than my knees, and my knees are ancient pieces of shit. Legend says a blade sleeps inside — the Sunblade, forged from the first dawn.",
-      "chars": 184,
-      "bytes": 201500
+      "chars": 205,
+      "bytes": 201918,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] The Hollow Shrine is older than any kingdom, older than my knees, and my knees are ancient pieces of shit. Legend says a blade sleeps inside — the Sunblade, forged from the first dawn."
     },
     "230a21820e8a3398": {
       "file": "maren/230a21820e8a3398.mp3",
       "speaker": "maren",
       "text": "When the star fell, the shrine drank its light and locked its doors. Whatever woke up in there has been gnawing at the seal ever since. Probably horny, definitely angry. That is usually how it goes.",
-      "chars": 198,
-      "bytes": 204008
+      "chars": 219,
+      "bytes": 212367,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] When the star fell, the shrine drank its light and locked its doors. Whatever woke up in there has been gnawing at the seal ever since. Probably horny, definitely angry. That is usually how it goes."
     },
     "222b99e007f160fa": {
       "file": "maren/222b99e007f160fa.mp3",
       "speaker": "maren",
       "text": "You carry a sword and you have not tripped over anything since you got here, which puts you ahead of every young man in this village.",
-      "chars": 133,
-      "bytes": 104951
+      "chars": 154,
+      "bytes": 122506,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] You carry a sword and you have not tripped over anything since you got here, which puts you ahead of every young man in this village."
     },
     "391f26c3805148c9": {
       "file": "maren/391f26c3805148c9.mp3",
       "speaker": "maren",
       "text": "Haul your shapely ass north through the Elderwood to the Hollow Shrine. Kick the door in, stab whatever screeches at you, and grab the Sunblade.",
-      "chars": 144,
-      "bytes": 125849
+      "chars": 165,
+      "bytes": 135462,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Haul your shapely ass north through the Elderwood to the Hollow Shrine. Kick the door in, stab whatever screeches at you, and grab the Sunblade."
     },
     "44ad324cfebb0046": {
       "file": "maren/44ad324cfebb0046.mp3",
       "speaker": "maren",
       "text": "Do this, and Brindlemere will owe you everything. Which, fair warning, is mostly stew and compliments.",
-      "chars": 102,
-      "bytes": 96174
+      "chars": 123,
+      "bytes": 113728,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Do this, and Brindlemere will owe you everything. Which, fair warning, is mostly stew and compliments."
     },
     "a5a5328beee6d4e1": {
       "file": "maren/a5a5328beee6d4e1.mp3",
       "speaker": "maren",
       "text": "Hot damn, an actual volunteer! Follow the north road past the standing stones and keep the peaks on your right. If you end up in the lake, you went wrong somewhere and frankly deserve it.",
-      "chars": 187,
-      "bytes": 182274
+      "chars": 197,
+      "bytes": 189379,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gleeful] Hot damn, an actual volunteer! Follow the north road past the standing stones and keep the peaks on your right. If you end up in the lake, you went wrong somewhere and frankly deserve it."
     },
     "da16029aad615090": {
       "file": "maren/da16029aad615090.mp3",
       "speaker": "maren",
       "text": "Rest here whenever you must — the village will patch your wounds and judge your life choices free of charge. Now piss off heroically.",
-      "chars": 133,
-      "bytes": 135462
+      "chars": 143,
+      "bytes": 117490,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gleeful] Rest here whenever you must — the village will patch your wounds and judge your life choices free of charge. Now piss off heroically."
     },
     "40ea4a29a56f4653": {
       "file": "maren/40ea4a29a56f4653.mp3",
       "speaker": "maren",
       "text": "Smart. Dead heroes are just expensive fertilizer. Talk to Captain Bram — angry little man, cannot miss him — and Nyla if you need medicine. The shrine has waited seventy years; it can wait for you to get your shit together.",
-      "chars": 223,
-      "bytes": 222398
+      "chars": 244,
+      "bytes": 241624,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Smart. Dead heroes are just expensive fertilizer. Talk to Captain Bram — angry little man, cannot miss him — and Nyla if you need medicine. The shrine has waited seventy years; it can wait for you to get your shit together."
     },
     "008041eef5aeafd4": {
       "file": "maren/008041eef5aeafd4.mp3",
       "speaker": "maren",
       "text": "The shrine is STILL north, sweetheart. Past the Elderwood, carved doorway in the rock, big amber sigil. It is not subtle. Neither am I.",
-      "chars": 135,
-      "bytes": 132537
+      "chars": 156,
+      "bytes": 170153,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] The shrine is STILL north, sweetheart. Past the Elderwood, carved doorway in the rock, big amber sigil. It is not subtle. Neither am I."
     },
     "7dd73271f4d18dab": {
       "file": "maren/7dd73271f4d18dab.mp3",
       "speaker": "maren",
       "text": "Go stab the scary thing and come back in one piece. I am too old to sew anyone back together.",
-      "chars": 93,
-      "bytes": 88651
+      "chars": 110,
+      "bytes": 84471,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gruff but fond] Go stab the scary thing and come back in one piece. I am too old to sew anyone back together."
     },
     "313ddd490108df23": {
       "file": "maren/313ddd490108df23.mp3",
       "speaker": "maren",
       "text": "Well butter my ass and call me a biscuit — the Sunblade! You actually did it! Seventy years of doom and gloom, fixed by some lunatic who walked in off the road!",
-      "chars": 160,
-      "bytes": 159286
+      "chars": 182,
+      "bytes": 189379,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[overjoyed, cackling] Well butter my ass and call me a biscuit — the Sunblade! You actually did it! Seventy years of doom and gloom, fixed by some lunatic who walked in off the road!"
     },
     "725067b02758320a": {
       "file": "maren/725067b02758320a.mp3",
       "speaker": "maren",
       "text": "The valley breathes easier tonight, traveller. You did what no army could, mostly because no army ever bothered to show up.",
-      "chars": 123,
-      "bytes": 112475
+      "chars": 144,
+      "bytes": 121252,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] The valley breathes easier tonight, traveller. You did what no army could, mostly because no army ever bothered to show up."
     },
     "38684645bee83eff": {
       "file": "maren/38684645bee83eff.mp3",
       "speaker": "maren",
       "text": "Take this blessing. It is the least Brindlemere owes you, and believe me, this village always pays the least it owes.",
-      "chars": 117,
-      "bytes": 103697
+      "chars": 138,
+      "bytes": 129193,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Take this blessing. It is the least Brindlemere owes you, and believe me, this village always pays the least it owes."
     },
     "633ffaf19dea2dbb": {
       "file": "maren/633ffaf19dea2dbb.mp3",
       "speaker": "maren",
       "text": "Every lantern in Brindlemere burns brighter since you got back. Now sit down and eat some stew before you fall over. Heroes are still idiots on an empty stomach.",
-      "chars": 161,
-      "bytes": 158450
+      "chars": 182,
+      "bytes": 154688,
+      "renderKey": "eleven_v3|XrExE9yKIg1WjnnlVkGX|{\"stability\":0.28,\"similarity_boost\":0.75,\"style\":0.65}|[gravelly, cackling] Every lantern in Brindlemere burns brighter since you got back. Now sit down and eat some stew before you fall over. Heroes are still idiots on an empty stomach."
     },
     "db353266f54507dc": {
       "file": "nyla/db353266f54507dc.mp3",
       "speaker": "nyla",
       "text": "Watch the doorway — drying herbs everywhere, and if you knock down my wolfsbane I will heal you and THEN kill you. I am Nyla. Scrapes, fevers and broken hearts mended, in that order, cash up front.",
-      "chars": 197,
-      "bytes": 220308
+      "chars": 219,
+      "bytes": 257088,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[cheerfully menacing] Watch the doorway — drying herbs everywhere, and if you knock down my wolfsbane I will heal you and THEN kill you. I am Nyla. Scrapes, fevers and broken hearts mended, in that order, cash up front."
     },
     "d39656bb5acd8551": {
       "file": "nyla/d39656bb5acd8551.mp3",
       "speaker": "nyla",
       "text": "My potion stores are drier than a lizard’s armpit. The good glowshrooms only grow in the Elderwood shade, and I am not going in there — the last thing that skittered at me had way too many legs and zero respect.",
-      "chars": 211,
-      "bytes": 204844
+      "chars": 229,
+      "bytes": 231593,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[brisk, sardonic] My potion stores are drier than a lizard’s armpit. The good glowshrooms only grow in the Elderwood shade, and I am not going in there — the last thing that skittered at me had way too many legs and zero respect."
     },
     "61103f39ba9e6673": {
       "file": "nyla/61103f39ba9e6673.mp3",
       "speaker": "nyla",
       "text": "Oh, bless your reckless little heart. Five glowshrooms — the blue glowing caps under the old trees. And yes, before you ask, people HAVE tried licking them. Those people now speak exclusively to furniture.",
-      "chars": 205,
-      "bytes": 204844
+      "chars": 215,
+      "bytes": 246639,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[deadpan] Oh, bless your reckless little heart. Five glowshrooms — the blue glowing caps under the old trees. And yes, before you ask, people HAVE tried licking them. Those people now speak exclusively to furniture."
     },
     "072d2385ef4f680f": {
       "file": "nyla/072d2385ef4f680f.mp3",
       "speaker": "nyla",
       "text": "Bring the shrooms back un-licked and I will brew you something worth the walk.",
-      "chars": 78,
-      "bytes": 66499
+      "chars": 96,
+      "bytes": 75276,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[brisk, sardonic] Bring the shrooms back un-licked and I will brew you something worth the walk."
     },
     "58c5930ce8e395d6": {
       "file": "nyla/58c5930ce8e395d6.mp3",
       "speaker": "nyla",
       "text": "Sleep with your boots on, never trust anything with more eyes than you, and do not swim on an empty stamina wheel unless drowning like a dumbass is on your bucket list. That last one is not a joke. I have pulled three heroes out of that lake. Two were grateful.",
-      "chars": 261,
-      "bytes": 241624
+      "chars": 279,
+      "bytes": 317275,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[brisk, sardonic] Sleep with your boots on, never trust anything with more eyes than you, and do not swim on an empty stamina wheel unless drowning like a dumbass is on your bucket list. That last one is not a joke. I have pulled three heroes out of that lake. Two were grateful."
     },
     "cf1f6ae372382019": {
       "file": "nyla/cf1f6ae372382019.mp3",
       "speaker": "nyla",
       "text": "Perfect caps, every damn one. Give me a breath… aaand there. Two restoratives, and coin for your trouble. Do not chug them both at once, you absolute animal.",
-      "chars": 157,
-      "bytes": 166809
+      "chars": 175,
+      "bytes": 207351,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[brisk, sardonic] Perfect caps, every damn one. Give me a breath… aaand there. Two restoratives, and coin for your trouble. Do not chug them both at once, you absolute animal."
     },
     "a3b3550704ecd68d": {
       "file": "nyla/a3b3550704ecd68d.mp3",
       "speaker": "nyla",
       "text": "Drink them when the hearts run low — inventory, then use. Even heroes forget, because heroes, as a rule, are gorgeous and stupid.",
-      "chars": 129,
-      "bytes": 136298
+      "chars": 147,
+      "bytes": 168899,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[brisk, sardonic] Drink them when the hearts run low — inventory, then use. Even heroes forget, because heroes, as a rule, are gorgeous and stupid."
     },
     "61a4c52d3854d407": {
       "file": "nyla/61a4c52d3854d407.mp3",
       "speaker": "nyla",
       "text": "My shelves glow again, thanks to you. If the wilds chew on you, come straight here. If a boglin chews on you somewhere embarrassing, come here anyway — I have seen worse and I WILL laugh.",
-      "chars": 187,
-      "bytes": 186035
+      "chars": 205,
+      "bytes": 223652,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[brisk, sardonic] My shelves glow again, thanks to you. If the wilds chew on you, come straight here. If a boglin chews on you somewhere embarrassing, come here anyway — I have seen worse and I WILL laugh."
     },
     "a149c792479fa698": {
       "file": "bram/a149c792479fa698.mp3",
       "speaker": "bram",
       "text": "Hold there — sword arm up, let us see… huh. You hold that thing like you have actually killed something. Around here that makes you a goddamn war hero. I am Bram, captain of a guard that consists of me and a bell.",
-      "chars": 213,
-      "bytes": 206933
+      "chars": 230,
+      "bytes": 313513,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[booming, gruff] Hold there — sword arm up, let us see… huh. You hold that thing like you have actually killed something. Around here that makes you a goddamn war hero. I am Bram, captain of a guard that consists of me and a bell."
     },
     "0a193a2d7f79de37": {
       "file": "bram/0a193a2d7f79de37.mp3",
       "speaker": "bram",
       "text": "Boglin camps are creeping closer every moon. Five camps ring this valley now, the cocky little shits, and last week one of them mooned me. MOONED me. A captain of the guard.",
-      "chars": 173,
-      "bytes": 175586
+      "chars": 184,
+      "bytes": 263358,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[outraged] Boglin camps are creeping closer every moon. Five camps ring this valley now, the cocky little shits, and last week one of them mooned me. MOONED me. A captain of the guard."
     },
     "144654cc9e4ea026": {
       "file": "bram/144654cc9e4ea026.mp3",
       "speaker": "bram",
       "text": "HA! Music to my ears. Put down ten of the wretches — that should teach the rest to keep their pants up and their distance.",
-      "chars": 122,
-      "bytes": 115400
+      "chars": 140,
+      "bytes": 149673,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[barking a laugh] HA! Music to my ears. Put down ten of the wretches — that should teach the rest to keep their pants up and their distance."
     },
     "bfa95ba981bf1963": {
       "file": "bram/bfa95ba981bf1963.mp3",
       "speaker": "bram",
       "text": "Watch the big horned ones. When a brute raises that club, you ROLL. Do not block. Blocking a brute is how you become a smear with a sword. ROLL, damn you.",
-      "chars": 154,
-      "bytes": 159286
+      "chars": 165,
+      "bytes": 217382,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[shouting] Watch the big horned ones. When a brute raises that club, you ROLL. Do not block. Blocking a brute is how you become a smear with a sword. ROLL, damn you."
     },
     "ec52d9a6ee6b7dac": {
       "file": "bram/ec52d9a6ee6b7dac.mp3",
       "speaker": "bram",
       "text": "Three lessons, free, because I am bored out of my skull. One: the third swing hits like a divorce — finish your combos.",
-      "chars": 119,
-      "bytes": 125013
+      "chars": 136,
+      "bytes": 173915,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[booming, gruff] Three lessons, free, because I am bored out of my skull. One: the third swing hits like a divorce — finish your combos."
     },
     "c3c0c93dc2786f97": {
       "file": "bram/c3c0c93dc2786f97.mp3",
       "speaker": "bram",
       "text": "Two: hold your swing after the first cut and release to spin. Clears a crowd like a fart in a bathhouse.",
-      "chars": 104,
-      "bytes": 101190
+      "chars": 114,
+      "bytes": 145911,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[gleeful] Two: hold your swing after the first cut and release to spin. Clears a crowd like a fart in a bathhouse."
     },
     "a53ee9c95f31acf3": {
       "file": "bram/a53ee9c95f31acf3.mp3",
       "speaker": "bram",
       "text": "Three: lock on. Tab, or click the stick. A guard who circles wins the fight. A guard who stands still gets a club suppository.",
-      "chars": 126,
-      "bytes": 127939
+      "chars": 136,
+      "bytes": 181438,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[gleeful] Three: lock on. Tab, or click the stick. A guard who circles wins the fight. A guard who stands still gets a club suppository."
     },
     "253f2e37f0cd8dcd": {
       "file": "bram/253f2e37f0cd8dcd.mp3",
       "speaker": "bram",
       "text": "Outstanding work, soldier. Here — guard pay, plus a breathing trick I learned from a monk I arm-wrestled. Long story. He cheated. So did I.",
-      "chars": 139,
-      "bytes": 159286
+      "chars": 156,
+      "bytes": 182692,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[booming, gruff] Outstanding work, soldier. Here — guard pay, plus a breathing trick I learned from a monk I arm-wrestled. Long story. He cheated. So did I."
     },
     "d71370738a2988b9": {
       "file": "bram/d71370738a2988b9.mp3",
       "speaker": "bram",
       "text": "Deeper breaths, longer sprints. Now get out of here before I salute you and embarrass us both.",
-      "chars": 94,
-      "bytes": 86561
+      "chars": 111,
+      "bytes": 104951,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[booming, gruff] Deeper breaths, longer sprints. Now get out of here before I salute you and embarrass us both."
     },
     "8661fc9e0ea2c044": {
       "file": "bram/8661fc9e0ea2c044.mp3",
       "speaker": "bram",
       "text": "The watchfires burn quiet lately. Your doing. If you ever want honest work, the guard pays like crap and the bell needs polishing, but the company is outstanding. It is me. I am the company.",
-      "chars": 190,
-      "bytes": 206933
+      "chars": 207,
+      "bytes": 264612,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[booming, gruff] The watchfires burn quiet lately. Your doing. If you ever want honest work, the guard pays like crap and the bell needs polishing, but the company is outstanding. It is me. I am the company."
     },
     "9964d0beb208d804": {
       "file": "tam/9964d0beb208d804.mp3",
       "speaker": "tam",
       "text": "Welcome, welcome! Tam’s Sundries — finest stall between the lake and the peaks, on account of being the only one. Competition is for suckers and towns with more than six people.",
-      "chars": 177,
-      "bytes": 180184
+      "chars": 190,
+      "bytes": 182692,
+      "renderKey": "eleven_v3|JBFqnCBsd6RMkjVDRZzb|{\"stability\":0.35,\"similarity_boost\":0.75,\"style\":0.6}|[warm, oily] Welcome, welcome! Tam’s Sundries — finest stall between the lake and the peaks, on account of being the only one. Competition is for suckers and towns with more than six people."
     },
     "861258346ae43f0e": {
       "file": "tam/861258346ae43f0e.mp3",
       "speaker": "tam",
       "text": "What will it be? And no, the prices are not negotiable. I have a monopoly and a complete lack of shame.",
-      "chars": 103,
-      "bytes": 120834
+      "chars": 121,
+      "bytes": 109967,
+      "renderKey": "eleven_v3|JBFqnCBsd6RMkjVDRZzb|{\"stability\":0.35,\"similarity_boost\":0.75,\"style\":0.6}|[shameless pride] What will it be? And no, the prices are not negotiable. I have a monopoly and a complete lack of shame."
     },
     "77fc2bf16b7f87fb": {
       "file": "tam/77fc2bf16b7f87fb.mp3",
       "speaker": "tam",
       "text": "Pleasure doing business! Drink it when the hearts run low, and if it tastes like feet — that is normal. That is how you know it is working.",
-      "chars": 139,
-      "bytes": 144657
+      "chars": 148,
+      "bytes": 144239,
+      "renderKey": "eleven_v3|JBFqnCBsd6RMkjVDRZzb|{\"stability\":0.35,\"similarity_boost\":0.75,\"style\":0.6}|[breezy] Pleasure doing business! Drink it when the hearts run low, and if it tastes like feet — that is normal. That is how you know it is working."
     },
     "2f5137a8349cdc12": {
       "file": "tam/2f5137a8349cdc12.mp3",
       "speaker": "tam",
       "text": "Broke, eh? No shame in it — well, some shame. Gems: green ones, blue worth five, red worth twenty. Boglins hoard them because boglins are tiny greedy bastards, and chests hide them. Come back jingling!",
-      "chars": 201,
-      "bytes": 252909
+      "chars": 214,
+      "bytes": 286346,
+      "renderKey": "eleven_v3|JBFqnCBsd6RMkjVDRZzb|{\"stability\":0.35,\"similarity_boost\":0.75,\"style\":0.6}|[warm, oily] Broke, eh? No shame in it — well, some shame. Gems: green ones, blue worth five, red worth twenty. Boglins hoard them because boglins are tiny greedy bastards, and chests hide them. Come back jingling!"
     },
     "86808ced4c5c7947": {
       "file": "tam/86808ced4c5c7947.mp3",
       "speaker": "tam",
       "text": "Crack open a boglin camp or a chest and they pour out like rain. The ruins east of the wood are said to hold a fat one. You did not hear that from me, because technically telling you counts as \"looting advice\" and my permit is… let us say \"aspirational.\"",
-      "chars": 254,
-      "bytes": 271717
+      "chars": 271,
+      "bytes": 290525,
+      "renderKey": "eleven_v3|JBFqnCBsd6RMkjVDRZzb|{\"stability\":0.35,\"similarity_boost\":0.75,\"style\":0.6}|[conspiratorial] Crack open a boglin camp or a chest and they pour out like rain. The ruins east of the wood are said to hold a fat one. You did not hear that from me, because technically telling you counts as \"looting advice\" and my permit is… let us say \"aspirational.\""
     },
     "da650abd19a8b247": {
       "file": "pip/da650abd19a8b247.mp3",
       "speaker": "pip",
       "text": "Psst! Traveller! Wanna hear a secret? I know ALL the secrets. Even the ones mum says will get my mouth washed out.",
-      "chars": 114,
-      "bytes": 118326
+      "chars": 133,
+      "bytes": 134208,
+      "renderKey": "eleven_v3|cgSgspJ2msm6clMCkdW9|{\"stability\":0.2,\"similarity_boost\":0.7,\"style\":0.85}|[breathless child] Psst! Traveller! Wanna hear a secret? I know ALL the secrets. Even the ones mum says will get my mouth washed out."
     },
     "6b1416d8e04768b2": {
       "file": "pip/6b1416d8e04768b2.mp3",
       "speaker": "pip",
       "text": "The old standing stones east of the woods? If you climb the hill at night, the tops glow a tiny bit. Farmer Rho says it is moss. Rho is FULL OF CRAP. That is swearing but mum is not here so.",
-      "chars": 190,
-      "bytes": 210695
+      "chars": 208,
+      "bytes": 298048,
+      "renderKey": "eleven_v3|cgSgspJ2msm6clMCkdW9|{\"stability\":0.2,\"similarity_boost\":0.7,\"style\":0.85}|[gleeful whisper] The old standing stones east of the woods? If you climb the hill at night, the tops glow a tiny bit. Farmer Rho says it is moss. Rho is FULL OF CRAP. That is swearing but mum is not here so."
     },
     "fe71b31d419c2fc7": {
       "file": "pip/fe71b31d419c2fc7.mp3",
       "speaker": "pip",
       "text": "Also there is a chest up there. I am too small to open it. You are not! You are HUGE. Like a brute but with better teeth!",
-      "chars": 121,
-      "bytes": 131283
+      "chars": 140,
+      "bytes": 160958,
+      "renderKey": "eleven_v3|cgSgspJ2msm6clMCkdW9|{\"stability\":0.2,\"similarity_boost\":0.7,\"style\":0.85}|[breathless child] Also there is a chest up there. I am too small to open it. You are not! You are HUGE. Like a brute but with better teeth!"
     },
     "c714a9e3f824ad69": {
       "file": "pip/c714a9e3f824ad69.mp3",
       "speaker": "pip",
       "text": "Down by Mirrowmere, way out along the far shore, I saw a chest half-buried in the sand! But the deep water is scary and mum says I will be eaten butt-first.",
-      "chars": 156,
-      "bytes": 167645
+      "chars": 175,
+      "bytes": 207351,
+      "renderKey": "eleven_v3|cgSgspJ2msm6clMCkdW9|{\"stability\":0.2,\"similarity_boost\":0.7,\"style\":0.85}|[breathless child] Down by Mirrowmere, way out along the far shore, I saw a chest half-buried in the sand! But the deep water is scary and mum says I will be eaten butt-first."
     },
     "690966f2e637c7d8": {
       "file": "pip/690966f2e637c7d8.mp3",
       "speaker": "pip",
       "text": "If you find gems in it I get ten percent. That is the RULE of secrets. I did not make the rule but I enforce the hell out of it. THAT one does not count as swearing, Bram says it constantly.",
-      "chars": 190,
-      "bytes": 204008
+      "chars": 205,
+      "bytes": 255835,
+      "renderKey": "eleven_v3|cgSgspJ2msm6clMCkdW9|{\"stability\":0.2,\"similarity_boost\":0.7,\"style\":0.85}|[very serious] If you find gems in it I get ten percent. That is the RULE of secrets. I did not make the rule but I enforce the hell out of it. THAT one does not count as swearing, Bram says it constantly."
     },
     "5df8abc9026bf693": {
       "file": "rho/5df8abc9026bf693.mp3",
       "speaker": "rho",
       "text": "Grass is good this season. Rain when we need it, sun when we do not. Only things spoiling the view are boglin smoke on the ridges and Bram doing shirtless \"patrols\" past the widow Hettle’s fence. Nobody is fooled, Bram.",
-      "chars": 219,
-      "bytes": 280494
+      "chars": 238,
+      "bytes": 295541,
+      "renderKey": "eleven_v3|pqHfZKP75CvOlQylNhV4|{\"stability\":0.45,\"similarity_boost\":0.75,\"style\":0.4}|[dry, scandalized] Grass is good this season. Rain when we need it, sun when we do not. Only things spoiling the view are boglin smoke on the ridges and Bram doing shirtless \"patrols\" past the widow Hettle’s fence. Nobody is fooled, Bram."
     },
     "ffd592feda638994": {
       "file": "rho/ffd592feda638994.mp3",
       "speaker": "rho",
       "text": "Aye — wisps. Pale cold lights drifting over the fields once the sun is well down. Pretty, until one spits fire at you. Lost half a haystack and most of my dignity running from one last week.",
-      "chars": 190,
-      "bytes": 242460
+      "chars": 199,
+      "bytes": 262104,
+      "renderKey": "eleven_v3|pqHfZKP75CvOlQylNhV4|{\"stability\":0.45,\"similarity_boost\":0.75,\"style\":0.4}|[rueful] Aye — wisps. Pale cold lights drifting over the fields once the sun is well down. Pretty, until one spits fire at you. Lost half a haystack and most of my dignity running from one last week."
     },
     "7dc47cddcff2ca77": {
       "file": "rho/7dc47cddcff2ca77.mp3",
       "speaker": "rho",
       "text": "They fade at dawn like dew. If one takes to hissing at you, put steel through the glowing bit and do not write a ballad about it. Looking at you, every bard ever.",
-      "chars": 162,
-      "bytes": 182274
+      "chars": 169,
+      "bytes": 209859,
+      "renderKey": "eleven_v3|pqHfZKP75CvOlQylNhV4|{\"stability\":0.45,\"similarity_boost\":0.75,\"style\":0.4}|[flat] They fade at dawn like dew. If one takes to hissing at you, put steel through the glowing bit and do not write a ballad about it. Looking at you, every bard ever."
     },
     "8ac74b173998935d": {
       "file": "pip/8ac74b173998935d.mp3",
       "speaker": "pip",
       "text": "You went INSIDE the shrine?! Was there a monster? How big? Bigger than the well? Bigger than TWO wells?! Captain Bram said a word when he heard and mum made him put a coin in the jar!",
-      "chars": 183,
-      "bytes": 181020
+      "chars": 195,
+      "bytes": 236608,
+      "renderKey": "eleven_v3|cgSgspJ2msm6clMCkdW9|{\"stability\":0.2,\"similarity_boost\":0.7,\"style\":0.85}|[shrieking] You went INSIDE the shrine?! Was there a monster? How big? Bigger than the well? Bigger than TWO wells?! Captain Bram said a word when he heard and mum made him put a coin in the jar!"
     },
     "3a5be24bea252e81": {
       "file": "nyla/3a5be24bea252e81.mp3",
       "speaker": "nyla",
       "text": "Is that glow coming from your pack, or are you just happy to see me? Hand them over!",
-      "chars": 84,
-      "bytes": 71515
+      "chars": 94,
+      "bytes": 100772,
+      "renderKey": "eleven_v3|Xb7hH8MSUJpSbSDYk0k2|{\"stability\":0.34,\"similarity_boost\":0.75,\"style\":0.55}|[teasing] Is that glow coming from your pack, or are you just happy to see me? Hand them over!"
     },
     "78bde9ee37d1e934": {
       "file": "bram/78bde9ee37d1e934.mp3",
       "speaker": "bram",
       "text": "Word travels — the camps are pissing themselves about a green-cloaked demon. That would be you, you magnificent maniac. Report!",
-      "chars": 127,
-      "bytes": 115400
+      "chars": 144,
+      "bytes": 176422,
+      "renderKey": "eleven_v3|N2lVS1w4EtoT3dr4eOWO|{\"stability\":0.25,\"similarity_boost\":0.8,\"style\":0.75}|[booming, gruff] Word travels — the camps are pissing themselves about a green-cloaked demon. That would be you, you magnificent maniac. Report!"
     }
-  }
+  },
+  "model": "eleven_v3",
+  "generated": "2026-08-04T02:29:15.736Z"
 }
