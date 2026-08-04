@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated": "2026-08-04T02:42:06.120Z",
+  "generated": "2026-08-04T03:02:04.291Z",
   "note": "Placeholder — no generated sound effects yet. Run `node tools/gen-sfx.mjs`, or use the 'Generate audio' workflow. The game synthesizes every effect procedurally without this.",
   "sounds": {
     "sword1": {
@@ -8,6 +8,150 @@
       "seconds": 0.5,
       "bytes": 8821,
       "promptKey": "28c0af85f29f"
+    },
+    "sword2": {
+      "file": "sword2.mp3",
+      "seconds": 0.5,
+      "bytes": 8821,
+      "promptKey": "0fae3910d31f"
+    },
+    "sword3": {
+      "file": "sword3.mp3",
+      "seconds": 0.8,
+      "bytes": 13836,
+      "promptKey": "099c9d4faf49"
+    },
+    "spin": {
+      "file": "spin.mp3",
+      "seconds": 1.1,
+      "bytes": 18434,
+      "promptKey": "be7875764d22"
+    },
+    "crit": {
+      "file": "crit.mp3",
+      "seconds": 0.7,
+      "bytes": 12164,
+      "promptKey": "8e2527e4f7d0"
+    },
+    "block": {
+      "file": "block.mp3",
+      "seconds": 0.5,
+      "bytes": 8821,
+      "promptKey": "e6aff1649c59"
+    },
+    "enemy_hit": {
+      "file": "enemy_hit.mp3",
+      "seconds": 0.5,
+      "bytes": 8821,
+      "promptKey": "decfe3d75c25"
+    },
+    "enemy_die": {
+      "file": "enemy_die.mp3",
+      "seconds": 0.9,
+      "bytes": 15090,
+      "promptKey": "96cdc2668bdf"
+    },
+    "hurt": {
+      "file": "hurt.mp3",
+      "seconds": 0.6,
+      "bytes": 10493,
+      "promptKey": "c4d024fc28a0"
+    },
+    "heal": {
+      "file": "heal.mp3",
+      "seconds": 1.4,
+      "bytes": 23031,
+      "promptKey": "ff96fc6b5af4"
+    },
+    "gem": {
+      "file": "gem.mp3",
+      "seconds": 0.5,
+      "bytes": 8821,
+      "promptKey": "6b0a0a2b00bd"
+    },
+    "key": {
+      "file": "key.mp3",
+      "seconds": 0.7,
+      "bytes": 12164,
+      "promptKey": "6396abf96e31"
+    },
+    "chest": {
+      "file": "chest.mp3",
+      "seconds": 1.2,
+      "bytes": 20106,
+      "promptKey": "fcde29c6a6d8"
+    },
+    "chest_big": {
+      "file": "chest_big.mp3",
+      "seconds": 2.2,
+      "bytes": 36406,
+      "promptKey": "68652a1cd9dd"
+    },
+    "secret": {
+      "file": "secret.mp3",
+      "seconds": 1.8,
+      "bytes": 29301,
+      "promptKey": "d80b87ca9eb1"
+    },
+    "roll": {
+      "file": "roll.mp3",
+      "seconds": 0.7,
+      "bytes": 12164,
+      "promptKey": "27d05414c9df"
+    },
+    "splash": {
+      "file": "splash.mp3",
+      "seconds": 1,
+      "bytes": 17180,
+      "promptKey": "e060cae912d2"
+    },
+    "door": {
+      "file": "door.mp3",
+      "seconds": 1.5,
+      "bytes": 24703,
+      "promptKey": "4f22bf1ee326"
+    },
+    "portal": {
+      "file": "portal.mp3",
+      "seconds": 2,
+      "bytes": 33062,
+      "promptKey": "6aff13d5ccc9"
+    },
+    "explosion": {
+      "file": "explosion.mp3",
+      "seconds": 1.6,
+      "bytes": 26793,
+      "promptKey": "67965ec09af1"
+    },
+    "bolt": {
+      "file": "bolt.mp3",
+      "seconds": 0.7,
+      "bytes": 12164,
+      "promptKey": "2dce4dc174d7"
+    },
+    "boss_hit": {
+      "file": "boss_hit.mp3",
+      "seconds": 0.8,
+      "bytes": 13836,
+      "promptKey": "ed4b30d23f8f"
+    },
+    "boss_roar": {
+      "file": "boss_roar.mp3",
+      "seconds": 2.6,
+      "bytes": 41839,
+      "promptKey": "7199cb7da838"
+    },
+    "quest": {
+      "file": "quest.mp3",
+      "seconds": 1.8,
+      "bytes": 29301,
+      "promptKey": "91e481b73a35"
+    },
+    "brazier": {
+      "file": "brazier.mp3",
+      "seconds": 1.2,
+      "bytes": 20106,
+      "promptKey": "1c483a5f9381"
     }
   }
 }
