@@ -38,6 +38,9 @@ export class Voice {
       const m = await res.json();
       if (!m || typeof m !== 'object' || !m.lines) throw new Error('malformed manifest');
       this.manifest = m;
+      // Re-recording a line keeps its filename but changes the audio, so clip
+      // URLs carry a token from the manifest or the browser serves the old take.
+      this._ver = String(m.generated || m.model || '').replace(/[^0-9a-zA-Z]/g, '').slice(-14) || '1';
       this.available = Object.keys(m.lines).length > 0;
       if (this.available) {
         console.info(`[voice] ${Object.keys(m.lines).length} lines available`);
@@ -122,7 +125,7 @@ export class Voice {
     if (this._fetching.has(hash)) return this._fetching.get(hash);
     const p = (async () => {
       try {
-        const res = await fetch(BASE_URL + entry.file);
+        const res = await fetch(`${BASE_URL}${entry.file}?v=${this._ver}`);
         if (!res.ok) throw new Error(`clip ${res.status}`);
         const bytes = await res.arrayBuffer();
         const ctx = this.game.audio && this.game.audio.ctx;

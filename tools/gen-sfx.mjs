@@ -91,15 +91,23 @@ if (dryRun) {
   const sub = await subscription(apiKey()).catch(() => null);
   if (sub) console.log(`\nQuota: ${sub.remaining.toLocaleString()} of ${sub.limit.toLocaleString()} characters left (${sub.tier}).`);
   console.log('\n--dry-run: nothing generated, no credits spent.');
-  console.log('ElevenLabs bills sound effects by duration, not characters — check');
-  console.log('their pricing page for how this maps to your plan.');
+  console.log('Sound effects are billed by duration, and the character-equivalent');
+  console.log('rate is not something this script can look up. To find it exactly,');
+  console.log('generate one short effect and compare the quota before and after:');
+  console.log('');
+  console.log('    --only sword1        (0.5s, the cheapest thing here)');
+  console.log('');
+  console.log('A real run prints the quota it consumed and extrapolates the rest,');
+  console.log('so one cheap effect tells you whether the full set fits.');
   process.exit(0);
 }
 if (pending.length === 0) { console.log('Nothing to do. Use --force to regenerate.'); process.exit(0); }
 
 const key = apiKey();
+const before = await subscription(key);
+if (before) console.log(`Quota before: ${before.remaining.toLocaleString()} of ${before.limit.toLocaleString()} (${before.tier}).`);
 mkdirSync(OUT_DIR, { recursive: true });
-let done = 0, failed = 0;
+let done = 0, failed = 0, madeSeconds = 0;
 for (const n of pending) {
   const spec = SFX[n];
   process.stdout.write(`  [${String(++done).padStart(2)}/${pending.length}] ${n.padEnd(11)} ${spec.d}s\n`);
@@ -108,6 +116,7 @@ for (const n of pending) {
     const rel = `${n}.mp3`;
     writeFileSync(join(OUT_DIR, rel), mp3);
     manifest.sounds[n] = { file: rel, seconds: spec.d, bytes: mp3.length, promptKey: keyOf(n) };
+    madeSeconds += spec.d;
   } catch (err) {
     failed++;
     console.error(`      ✗ ${err.message}`);
@@ -128,3 +137,23 @@ manifest.generated = new Date().toISOString();
 writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
 console.log(`\nWrote ${Object.keys(manifest.sounds).length} effects to assets/sfx/`);
 if (failed) console.log(`${failed} failed — re-run to retry just those.`);
+
+// Report what this actually cost, and what finishing the set would cost.
+const after = await subscription(key);
+if (before && after && madeSeconds > 0) {
+  const spent = Math.max(0, before.remaining - after.remaining);
+  console.log(`\nQuota after: ${after.remaining.toLocaleString()} of ${after.limit.toLocaleString()}.`);
+  console.log(`This run generated ${madeSeconds.toFixed(1)}s and consumed ${spent.toLocaleString()} credits.`);
+  if (spent > 0) {
+    const perSec = spent / madeSeconds;
+    const left = names.filter((n) => !manifest.sounds[n]).reduce((t, n) => t + SFX[n].d, 0);
+    console.log(`That is about ${perSec.toFixed(0)} credits per second of audio.`);
+    if (left > 0) {
+      const need = Math.ceil(left * perSec);
+      console.log(`Remaining effects: ${left.toFixed(1)}s ≈ ${need.toLocaleString()} credits.`);
+      console.log(need <= after.remaining
+        ? '  That fits in what you have left.'
+        : `  That exceeds your remaining ${after.remaining.toLocaleString()} — generate the rest after your quota resets.`);
+    }
+  }
+}

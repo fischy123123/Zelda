@@ -31,6 +31,7 @@ export class SfxPack {
       const m = await res.json();
       if (!m || !m.sounds || !Object.keys(m.sounds).length) throw new Error('empty');
       this.manifest = m;
+      this._ver = String(m.generated || '').replace(/[^0-9a-zA-Z]/g, '').slice(-14) || '1';
       this.available = true;
       console.info(`[sfx] ${Object.keys(m.sounds).length} generated effects available`);
     } catch (e) {
@@ -85,7 +86,7 @@ export class SfxPack {
     if (this._loading.has(name)) return this._loading.get(name);
     const p = (async () => {
       try {
-        const res = await fetch(SFX_BASE + entry.file);
+        const res = await fetch(`${SFX_BASE}${entry.file}?v=${this._ver}`);
         if (!res.ok) throw new Error(String(res.status));
         const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
         this._buffers.set(name, decoded);
@@ -124,6 +125,7 @@ export class MusicPack {
       const m = await res.json();
       if (!m || !m.tracks || !Object.keys(m.tracks).length) throw new Error('empty');
       this.manifest = m;
+      this._ver = String(m.generated || '').replace(/[^0-9a-zA-Z]/g, '').slice(-14) || '1';
       this.available = true;
       console.info(`[music] ${Object.keys(m.tracks).length} generated tracks available`);
     } catch (e) {
@@ -184,7 +186,7 @@ export class MusicPack {
     const entry = this.manifest.tracks[mood];
     if (!entry) return null;
     try {
-      const el = new Audio(MUSIC_BASE + entry.file);
+      const el = new Audio(`${MUSIC_BASE}${entry.file}?v=${this._ver}`);
       el.loop = true;
       el.crossOrigin = 'anonymous';
       el.preload = 'auto';
