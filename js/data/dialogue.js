@@ -3,6 +3,14 @@
 // { def, entry } — the dialogue definition plus which node to open with.
 
 export function getDialogue(id, game) {
+  const r = buildDialogue(id, game);
+  // Voice clips are keyed by the dialogue id (see js/core/Voice.js), not the
+  // display name, so renaming a character doesn't orphan their audio.
+  if (r && r.def) r.def.voiceId = id;
+  return r;
+}
+
+function buildDialogue(id, game) {
   const q = game.quests;
   const s = game.state;
   switch (id) {

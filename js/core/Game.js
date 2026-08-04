@@ -23,6 +23,7 @@ import { Vegetation } from '../gfx/Vegetation.js';
 import { Particles } from '../gfx/Particles.js';
 import { PostFX } from '../gfx/PostFX.js';
 import { HeroModel } from '../entities/HeroModel.js';
+import { Voice } from './Voice.js';
 import { Village } from '../world/Village.js';
 import { Dungeon } from '../world/Dungeon.js';
 import { Quests } from '../systems/Quests.js';
@@ -88,6 +89,7 @@ export class Game {
     this.vegetation = new Vegetation(this);
     this.particles = new Particles(this);
     this.audio = new AudioEngine(this);
+    this.voice = new Voice(this);
     this.world = new World(this);
     this.village = new Village(this);
     this.dungeon = new Dungeon(this);

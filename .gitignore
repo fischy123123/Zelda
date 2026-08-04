@@ -3,3 +3,6 @@ node_modules/
 *.log
 .cache/
 dist/
+
+# Local secrets (ElevenLabs API key for tools/gen-voices.mjs)
+.env.local

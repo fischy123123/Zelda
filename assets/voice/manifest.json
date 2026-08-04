@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "model": null,
+  "generated": null,
+  "note": "Placeholder — no voice pack generated yet. Run `node tools/gen-voices.mjs` with an ELEVENLABS_API_KEY to fill this in. The game plays normally either way.",
+  "voices": {},
+  "lines": {}
+}

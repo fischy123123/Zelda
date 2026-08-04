@@ -42,6 +42,7 @@ export class Dialogue {
     this._blipT = 0;
     this._choiceList = null;
     this._sel = 0;
+    this._voiced = false;
   }
 
   get open() { return !!this._def; }
@@ -90,6 +91,14 @@ export class Dialogue {
     this.textEl.textContent = '';
     this.advEl.classList.remove('on');
     this._hideChoices();
+    // Voiced line, if this one was generated. When a clip plays we mute the
+    // typewriter blips so the two don't talk over each other.
+    this._voiced = false;
+    const voice = this.game.voice;
+    if (voice && this._def) {
+      const speaker = this._def.voiceId || this._def.name;
+      this._voiced = voice.play(speaker, this._full);
+    }
   }
 
   _pageDone() {
@@ -150,6 +159,7 @@ export class Dialogue {
   _select(i) {
     const c = this._choiceList && this._choiceList[i];
     if (!c) return;
+    this.game.voice?.stop();
     this.ui.sfx('ui_select');
     this._hideChoices();
     if (typeof c.action === 'function') {
@@ -167,6 +177,7 @@ export class Dialogue {
     if (this._typing) { this._pageDone(); return; }
     if (this._choiceList) { this._select(this._sel); return; }
     if (this._page < this._pages.length - 1) {
+      this.game.voice?.stop();
       this._page++;
       this._startPage();
       return;
@@ -178,6 +189,8 @@ export class Dialogue {
 
   _end() {
     if (!this._def) return;
+    this.game.voice?.stop();
+    this._voiced = false;
     this._def = null;
     this._node = null;
     this._hideChoices();
@@ -214,7 +227,7 @@ export class Dialogue {
         const ch = this._full.charAt(n - 1);
         this._shown = n;
         this.textEl.textContent = this._full.slice(0, n);
-        if (this._blipT <= 0 && ch !== ' ' && ch !== '\n') {
+        if (!this._voiced && this._blipT <= 0 && ch !== ' ' && ch !== '\n') {
           this._blipT = BLIP_GAP;
           this.ui.sfx('dialogue_blip');
         }

@@ -222,11 +222,11 @@ export class AudioEngine {
     this._maxVoices = this._low ? 40 : 64;
     this._nVoices = 0;
 
-    this._vol = { master: 0.9, music: 0.8, sfx: 0.9 };
+    this._vol = { master: 0.9, music: 0.8, sfx: 0.9, voice: 1 };
     try {
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
       if (saved) {
-        for (const k of ['master', 'music', 'sfx']) {
+        for (const k of ['master', 'music', 'sfx', 'voice']) {
           if (typeof saved[k] === 'number') this._vol[k] = Math.min(1, Math.max(0, saved[k]));
         }
       }
@@ -242,6 +242,7 @@ export class AudioEngine {
     this._nextStep = 0;
     this._moodPoll = 0;
     this._duck = 1;
+    this._voiceDucking = false;
 
     // Context flags fed by events.
     this._bossActive = false;
@@ -268,10 +269,13 @@ export class AudioEngine {
     }
   }
 
-  get volumes() { return { master: this._vol.master, music: this._vol.music, sfx: this._vol.sfx }; }
+  get volumes() {
+    const v = this._vol;
+    return { master: v.master, music: v.music, sfx: v.sfx, voice: v.voice };
+  }
 
   setVolumes(v = {}) {
-    for (const k of ['master', 'music', 'sfx']) {
+    for (const k of ['master', 'music', 'sfx', 'voice']) {
       if (typeof v[k] === 'number') this._vol[k] = Math.min(1, Math.max(0, v[k]));
     }
     this._applyVolumes();
@@ -299,14 +303,18 @@ export class AudioEngine {
       this._applyMood(this._pickMood());
     }
 
-    // Duck the score when the hero falls.
-    const duckT = this.game.mode === 'dead' ? 0.12 : 1;
+    // Duck the score when the hero falls, and again under voiced dialogue
+    // so speech stays intelligible over the music.
+    const duckT = this.game.mode === 'dead' ? 0.12 : (this._voiceDucking ? 0.35 : 1);
     this._duck += (duckT - this._duck) * Math.min(1, rawDt * 1.5);
     this._musicDuck.gain.value = this._duck;
 
     this._tickSequencer();
     this._updateAmbience(rawDt);
   }
+
+  /** Pull the music down while a voice clip is speaking (see Voice.js). */
+  setVoiceDucking(on) { this._voiceDucking = !!on; }
 
   /** Play a named sound effect immediately. opts vary by name (see defs). */
   sfx(name, opts) {
@@ -347,6 +355,10 @@ export class AudioEngine {
     this.ambBus = ctx.createGain();
     this.ambBus.gain.value = 0.9;
     this.ambBus.connect(this.master);
+    // Voiced dialogue (see js/core/Voice.js) gets its own bus so players
+    // can turn speech down without muting the score.
+    this.voiceBus = ctx.createGain();
+    this.voiceBus.connect(this.master);
     this._applyVolumes();
 
     // Shared white-noise buffer for every burst/loop.
@@ -485,6 +497,7 @@ export class AudioEngine {
     this.master.gain.value = v.master * v.master;
     this.musicBus.gain.value = v.music * v.music;
     this.sfxBus.gain.value = v.sfx * v.sfx;
+    if (this.voiceBus) this.voiceBus.gain.value = v.voice * v.voice;
   }
 
   // -- mood selection --------------------------------------------------------

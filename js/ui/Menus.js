@@ -168,7 +168,7 @@ export class Menus {
     el('div', 'panel-orn', p, '✦');
 
     this._sliders = {};
-    for (const [key, label] of [['master', 'Master'], ['music', 'Music'], ['sfx', 'Effects']]) {
+    for (const [key, label] of [['master', 'Master'], ['music', 'Music'], ['sfx', 'Effects'], ['voice', 'Voice']]) {
       const row = el('div', 'set-row', p);
       el('label', null, row, label);
       const input = el('input', 'set-range', row);
@@ -210,7 +210,7 @@ export class Menus {
 
   _refreshSettings() {
     const vols = this.game.audio.volumes;
-    for (const key of ['master', 'music', 'sfx']) {
+    for (const key of ['master', 'music', 'sfx', 'voice']) {
       const s = this._sliders[key];
       const v = Math.round((vols[key] ?? 1) * 100);
       s.input.value = String(v);
