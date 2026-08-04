@@ -1,0 +1,96 @@
+# Generate the voiced-dialogue pack with ElevenLabs, entirely from the GitHub
+# website — no local checkout or terminal needed.
+#
+# One-time setup:
+#   Settings → Secrets and variables → Actions → New repository secret
+#   Name: ELEVENLABS_API_KEY     Secret: your sk_... key
+#
+# To run:
+#   Actions tab → "Generate voices" → Run workflow
+#
+# Leave "dry_run" checked the first time: it reports how many lines and
+# characters would be generated without spending any credits.
+
+name: Generate voices
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview only — report cost, generate nothing'
+        type: boolean
+        default: true
+      force:
+        description: 'Re-record every line, even ones already generated'
+        type: boolean
+        default: false
+      only:
+        description: 'Limit to one character (maren, nyla, bram, tam, pip, rho)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the game
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check the API key is present
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          if [ -z "$ELEVENLABS_API_KEY" ]; then
+            echo "::error::No ELEVENLABS_API_KEY secret found."
+            echo "Add it under Settings > Secrets and variables > Actions,"
+            echo "with the name ELEVENLABS_API_KEY."
+            exit 1
+          fi
+          echo "API key found."
+
+      - name: Generate
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ "${{ inputs.force }}" = "true" ]; then ARGS="$ARGS --force"; fi
+          if [ -n "${{ inputs.only }}" ]; then ARGS="$ARGS --only ${{ inputs.only }}"; fi
+          echo "Running: node tools/gen-voices.mjs $ARGS"
+          node tools/gen-voices.mjs $ARGS 2>&1 | tee run.log
+          # Surface the summary on the workflow's front page.
+          {
+            echo '## Voice generation'
+            echo '```'
+            cat run.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f run.log
+
+      - name: Commit the audio
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- assets/voice && git diff --quiet --cached -- assets/voice \
+             && [ -z "$(git ls-files --others --exclude-standard assets/voice)" ]; then
+            echo "Nothing changed — every line was already generated."
+            exit 0
+          fi
+          git add assets/voice
+          git commit -m "Add generated voice pack (ElevenLabs)"
+          # Bust the browser cache so phones pick the new audio up on reload.
+          HASH=$(git rev-parse --short HEAD)
+          sed -i "s|js/main\.js?v=[0-9a-f]*|js/main.js?v=$HASH|" index.html
+          git add index.html
+          git commit -m "Bump cache-bust version for voice pack"
+          git push
+          echo "Pushed. Reload the game and dialogue will be voiced." >> "$GITHUB_STEP_SUMMARY"
