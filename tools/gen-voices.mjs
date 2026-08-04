@@ -41,75 +41,164 @@ const MODEL_V2 = 'eleven_multilingual_v2';
 //
 // Low stability = more variation and emotion; high style = more theatrical.
 // ---------------------------------------------------------------------------
+// eleven_v3 stability is a three-point scale, not a slider: 0.0 Creative
+// (most responsive to direction, most variation), 0.5 Natural, 1.0 Robust.
+// The theatrical characters run Creative; the dry ones sit at Natural where
+// wandering delivery would read as a mistake rather than a choice.
 const CAST = {
   maren: {
     note: 'Ancient village elder. Foul-mouthed, warm, zero patience.',
     preferred: ['Matilda', 'Alice', 'Charlotte', 'Aria', 'Sarah'],
-    settings: { stability: 0.28, similarity_boost: 0.75, style: 0.65 },
-    tag: '[gravelly, cackling]',
-    lineTags: [
-      { match: /butter my ass|actually did it/i, tag: '[overjoyed, cackling]' },
-      { match: /jackass with a sword/i, tag: '[dry, unimpressed]' },
-      { match: /piss off heroically|Hot damn/i, tag: '[gleeful]' },
-      { match: /too old to sew/i, tag: '[gruff but fond]' },
-    ],
+    settings: { stability: 0.0, similarity_boost: 0.75 },
   },
   nyla: {
     note: 'Healer. Brisk, dry, mothers you while insulting you.',
     preferred: ['Alice', 'Sarah', 'Jessica', 'Lily', 'Aria'],
-    settings: { stability: 0.34, similarity_boost: 0.75, style: 0.55 },
-    tag: '[brisk, sardonic]',
-    lineTags: [
-      { match: /speak exclusively to furniture/i, tag: '[deadpan]' },
-      { match: /happy to see me/i, tag: '[teasing]' },
-      { match: /wolfsbane|THEN kill you/i, tag: '[cheerfully menacing]' },
-    ],
+    settings: { stability: 0.5, similarity_boost: 0.75 },
   },
   bram: {
     note: 'Guard captain. Loud, gravelly, aggressively enthusiastic.',
     preferred: ['Callum', 'Bill', 'Brian', 'Daniel', 'Roger'],
-    settings: { stability: 0.25, similarity_boost: 0.8, style: 0.75 },
-    tag: '[booming, gruff]',
-    lineTags: [
-      { match: /MOONED me|mooned/i, tag: '[outraged]' },
-      { match: /HA!|Music to my ears/i, tag: '[barking a laugh]' },
-      { match: /ROLL, damn you|Do not block/i, tag: '[shouting]' },
-      { match: /fart in a bathhouse|club suppository/i, tag: '[gleeful]' },
-    ],
+    settings: { stability: 0.0, similarity_boost: 0.8 },
   },
   tam: {
     note: 'Shopkeep. Smooth, jovial, shameless salesman.',
     preferred: ['George', 'Brian', 'Will', 'Eric', 'Roger'],
-    settings: { stability: 0.35, similarity_boost: 0.75, style: 0.6 },
-    tag: '[warm, oily]',
-    lineTags: [
-      { match: /monopoly and a complete lack of shame/i, tag: '[shameless pride]' },
-      { match: /tastes like feet/i, tag: '[breezy]' },
-      { match: /aspirational/i, tag: '[conspiratorial]' },
-    ],
+    settings: { stability: 0.5, similarity_boost: 0.75 },
   },
   pip: {
     note: 'Excitable kid. Fast, breathless, delighted with himself.',
     preferred: ['Jessica', 'Lily', 'River', 'Laura', 'Aria'],
-    settings: { stability: 0.2, similarity_boost: 0.7, style: 0.85 },
-    tag: '[breathless child]',
-    lineTags: [
-      { match: /Bigger than TWO wells/i, tag: '[shrieking]' },
-      { match: /FULL OF CRAP|swearing but mum/i, tag: '[gleeful whisper]' },
-      { match: /RULE of secrets/i, tag: '[very serious]' },
-    ],
+    settings: { stability: 0.0, similarity_boost: 0.7 },
   },
   rho: {
     note: 'Farmer. Slow, weathered, quietly amused.',
     preferred: ['Bill', 'Brian', 'Chris', 'Eric', 'Daniel'],
-    settings: { stability: 0.45, similarity_boost: 0.75, style: 0.4 },
-    tag: '[slow, weathered]',
-    lineTags: [
-      { match: /Nobody is fooled, Bram/i, tag: '[dry, scandalized]' },
-      { match: /most of my dignity/i, tag: '[rueful]' },
-      { match: /every bard ever/i, tag: '[flat]' },
-    ],
+    settings: { stability: 0.5, similarity_boost: 0.75 },
   },
+};
+
+// ---------------------------------------------------------------------------
+// Direction, one entry per line.
+//
+// An earlier pass tagged each line with a description of the character's voice
+// ("[gravelly, cackling]"), which is not direction at all: 31 of 51 lines got
+// the same generic label, so Maren's tender "I am too old to sew anyone back
+// together" was performed as cackling. Delivery has to come from what the line
+// says, so every line is directed individually here.
+//
+//   m   — matches the line (first hit wins)
+//   tag — how it opens
+//   ins — [pattern, tag] pairs inserted mid-line, because most of this dialogue
+//         is setup-then-punchline and the turn has to be audible
+// ---------------------------------------------------------------------------
+const DIRECTION = {
+  maren: [
+    { m: /^Oh good, another wandering/, tag: '[weary, sarcastic]',
+      ins: [[/which means I am old/, '[grumbling]']] },
+    { m: /^Seventy years ago a star/, tag: '[recounting something vast]',
+      ins: [[/Prettiest damn/, '[fondly]']] },
+    { m: /^Where it landed/, tag: '[ominous]',
+      ins: [[/And ever since/, '[exasperated]']] },
+    { m: /^The Hollow Shrine is older/, tag: '[reverent]',
+      ins: [[/older than my knees/, '[dry aside]'], [/Legend says/, '[reverent again]']] },
+    { m: /^When the star fell/, tag: '[grim]',
+      ins: [[/Probably horny/, '[flatly]']] },
+    { m: /^You carry a sword/, tag: '[appraising, grudgingly impressed]' },
+    { m: /^Haul your shapely ass/, tag: '[brisk, commanding]' },
+    { m: /^Do this, and Brindlemere/, tag: '[warm]',
+      ins: [[/Which, fair warning/, '[wry]']] },
+    { m: /^Hot damn, an actual volunteer/, tag: '[delighted, caught off guard]',
+      ins: [[/If you end up in the lake/, '[dry]']] },
+    { m: /^Rest here whenever you must/, tag: '[kindly]',
+      ins: [[/Now piss off/, '[gruffly affectionate]']] },
+    { m: /^Smart\. Dead heroes/, tag: '[approving, matter-of-fact]' },
+    { m: /^The shrine is STILL north/, tag: '[exasperated but patient]',
+      ins: [[/Neither am I/, '[amused]']] },
+    // The line that was previously cackling. It is the softest thing she says.
+    { m: /^Go stab the scary thing/, tag: '[quietly tender]' },
+    { m: /^Well butter my ass/, tag: '[astonished]',
+      ins: [[/You actually did it/, '[laughing with joy]']] },
+    { m: /^The valley breathes easier/, tag: '[moved, sincere]',
+      ins: [[/mostly because no army/, '[wry]']] },
+    { m: /^Take this blessing/, tag: '[solemn]',
+      ins: [[/and believe me/, '[wry]']] },
+    { m: /^Every lantern in Brindlemere/, tag: '[warm, motherly]',
+      ins: [[/Heroes are still idiots/, '[fond scolding]']] },
+  ],
+  nyla: [
+    { m: /^Watch the doorway/, tag: '[brisk, distracted]',
+      ins: [[/I will heal you and THEN/, '[cheerfully threatening]'], [/Scrapes, fevers/, '[businesslike]']] },
+    { m: /^My potion stores/, tag: '[dryly complaining]',
+      ins: [[/the last thing that skittered/, '[wary]']] },
+    { m: /^Oh, bless your reckless/, tag: '[fondly condescending]',
+      ins: [[/Those people now speak/, '[deadpan]']] },
+    { m: /^Bring the shrooms back/, tag: '[brisk, businesslike]' },
+    { m: /^Sleep with your boots on/, tag: '[rattling off practiced advice]',
+      ins: [[/That last one is not a joke/, '[suddenly serious]'], [/Two were grateful/, '[darkly amused]']] },
+    { m: /^Perfect caps/, tag: '[pleased, absorbed in the work]',
+      ins: [[/Do not chug them both/, '[scolding]']] },
+    { m: /^Drink them when the hearts/, tag: '[instructive]',
+      ins: [[/because heroes, as a rule/, '[affectionately insulting]']] },
+    { m: /^My shelves glow again/, tag: '[genuinely grateful]',
+      ins: [[/If a boglin chews/, '[teasing]']] },
+    { m: /^Is that glow coming/, tag: '[teasing, delighted]' },
+  ],
+  bram: [
+    { m: /^Hold there/, tag: '[barking an order]',
+      ins: [[/You hold that thing/, '[appraising, impressed]'], [/captain of a guard that consists/, '[self-deprecating]']] },
+    { m: /^Boglin camps are creeping/, tag: '[serious briefing]',
+      ins: [[/MOONED me/, '[outraged, wounded dignity]']] },
+    { m: /^HA! Music to my ears/, tag: '[barking a delighted laugh]' },
+    { m: /^Watch the big horned ones/, tag: '[urgent warning]',
+      ins: [[/ROLL, damn you/, '[shouting]']] },
+    { m: /^Three lessons, free/, tag: '[bored, then warming up]',
+      ins: [[/hits like a divorce/, '[amused at his own joke]']] },
+    { m: /^Two: hold your swing/, tag: '[instructive]',
+      ins: [[/Clears a crowd/, '[gleeful]']] },
+    { m: /^Three: lock on/, tag: '[instructive]',
+      ins: [[/gets a club suppository/, '[relishing it]']] },
+    { m: /^Outstanding work, soldier/, tag: '[proud]',
+      ins: [[/Long story/, '[sheepish]']] },
+    { m: /^Deeper breaths/, tag: '[gruff, hiding that he is moved]' },
+    { m: /^The watchfires burn quiet/, tag: '[sincere]',
+      ins: [[/It is me\. I am the company/, '[proudly deadpan]']] },
+    { m: /^Word travels/, tag: '[delighted, hugely impressed]' },
+  ],
+  tam: [
+    { m: /^Welcome, welcome/, tag: '[booming showman]',
+      ins: [[/on account of being the only one/, '[sly]']] },
+    { m: /^What will it be/, tag: '[cheerful]',
+      ins: [[/I have a monopoly/, '[shamelessly proud]']] },
+    { m: /^Pleasure doing business/, tag: '[delighted]',
+      ins: [[/if it tastes like feet/, '[breezily dismissive]']] },
+    { m: /^Broke, eh/, tag: '[mock sympathy]',
+      ins: [[/well, some shame/, '[sly]'], [/Gems: green ones/, '[brisk sales patter]']] },
+    { m: /^Crack open a boglin camp/, tag: '[enthusiastic]',
+      ins: [[/You did not hear that from me/, '[conspiratorial]'], [/aspirational/, '[evasive]']] },
+  ],
+  pip: [
+    { m: /^Psst! Traveller/, tag: '[whispering conspiratorially]',
+      ins: [[/I know ALL the secrets/, '[bursting with pride]']] },
+    { m: /^The old standing stones/, tag: '[excited]',
+      ins: [[/Rho is FULL OF CRAP/, '[indignant]'], [/That is swearing/, '[guilty thrill]']] },
+    { m: /^Also there is a chest/, tag: '[excited]',
+      ins: [[/You are HUGE/, '[awed]']] },
+    { m: /^Down by Mirrowmere/, tag: '[excited]',
+      ins: [[/But the deep water is scary/, '[frightened]']] },
+    { m: /^If you find gems in it/, tag: '[very serious, self-important]',
+      ins: [[/THAT one does not count/, '[defensive]']] },
+    { m: /^You went INSIDE the shrine/, tag: '[shrieking with awe]',
+      ins: [[/Captain Bram said a word/, '[scandalized delight]']] },
+  ],
+  rho: [
+    { m: /^Grass is good this season/, tag: '[contented, unhurried]',
+      ins: [[/and Bram doing shirtless/, '[dryly scandalized]']] },
+    { m: /^Aye — wisps/, tag: '[wistful]',
+      ins: [[/Lost half a haystack/, '[rueful]']] },
+    { m: /^They fade at dawn/, tag: '[matter-of-fact]',
+      ins: [[/Looking at you, every bard/, '[flatly annoyed]']] },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -168,12 +257,26 @@ function collectLines(onlyId = null) {
   return [...seen.values()];
 }
 
-/** What actually gets sent: the line, prefixed with a delivery tag on v3. */
+/** The direction entry for a line, or null if nobody wrote one. */
+function directionFor(line) {
+  const list = DIRECTION[line.speaker] || [];
+  return list.find((d) => d.m.test(line.text)) || null;
+}
+
+/**
+ * What actually gets sent. On v3 the line is opened with its direction and the
+ * mid-line turns are marked inline; on v2 the text goes out clean, since that
+ * model would read the brackets aloud.
+ */
 function scriptFor(line, model) {
   if (model !== MODEL_V3) return line.text;
-  const spec = CAST[line.speaker];
-  const override = (spec.lineTags || []).find((t) => t.match.test(line.text));
-  return `${(override || spec).tag} ${line.text}`;
+  const d = directionFor(line);
+  if (!d) return line.text;
+  let text = line.text;
+  for (const [pattern, tag] of d.ins || []) {
+    text = text.replace(pattern, (hit) => `${tag} ${hit}`);
+  }
+  return `${d.tag} ${text}`;
 }
 
 /** Fingerprint of everything that affects how a line sounds. */
@@ -262,6 +365,15 @@ if (dryRun) {
     console.log(`  ${id.padEnd(8)} ${String(n).padStart(3)} lines — ${CAST[id].note}`);
     console.log(`  ${' '.repeat(8)}     wants: ${CAST[id].preferred.join(', ')}`);
   }
+  const undirected = lines.filter((l) => !directionFor(l));
+  console.log(`\nDirection coverage:    ${lines.length - undirected.length}/${lines.length} lines`);
+  if (undirected.length) {
+    console.log('  These would fall back to a flat read — add them to DIRECTION:');
+    for (const l of undirected) console.log(`    ${l.speaker}: ${l.text.slice(0, 70)}…`);
+  }
+  const withIns = lines.filter((l) => (directionFor(l)?.ins || []).length).length;
+  console.log(`Lines with mid-line turns: ${withIns}`);
+
   const sub = await subscription(apiKey()).catch(() => null);
   if (sub) console.log(`\nQuota: ${sub.remaining.toLocaleString()} of ${sub.limit.toLocaleString()} characters left (${sub.tier}).`);
   console.log('\n--dry-run: nothing generated, no credits spent.');
